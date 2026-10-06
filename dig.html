@@ -1,0 +1,691 @@
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: даёт ли модель «мгновенные заходы + энергия + сон» напряжение «жадность против страха» без необходимости сидеть в игре ночами? -->
+<!-- Date: 2026-10-05 -->
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вулкан — прототип v4 (энергия)</title>
+<style>
+  :root {
+    --bg: #14110f; --panel: #1e1a17; --line: #3a322c; --text: #f1e7dc; --muted: #a8998b;
+    --accent: #ff8a3d; --danger: #ff4d4d; --ok: #3ddc84; --energy: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header b { color: var(--accent); }
+  .wrap { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 16px; align-items: flex-start; }
+  canvas { background: #000; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+  .side { flex: 1 1 320px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
+  .ana { flex: 1 1 320px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button { background: #2c2520; color: var(--text); border: 1px solid #4a3f37; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; min-height: 40px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #1a0f08; border-color: var(--accent); font-weight: 700; }
+  button.danger { background: #5a1a1a; border-color: var(--danger); }
+  button:disabled { opacity: .4; cursor: default; }
+  .big { font-size: 20px; font-weight: 700; }
+  .muted { color: var(--muted); }
+  .feed { max-height: 160px; overflow: auto; font-size: 12px; color: var(--muted); }
+  .pad { display: grid; grid-template-columns: repeat(3, 92px); gap: 6px; margin-top: 8px; }
+  .pad button { min-height: 60px; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; }
+  .pad small { font-size: 10px; color: var(--muted); line-height: 1.1; margin-top: 2px; }
+  .ebar { height: 12px; background: #2c2520; border-radius: 6px; overflow: hidden; min-width: 140px; flex: 1; }
+  .ebar div { height: 100%; background: var(--energy); }
+  .msg { min-height: 20px; color: var(--energy); font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border-bottom: 1px solid var(--line); padding: 2px 4px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .bar { height: 8px; background: var(--accent); border-radius: 2px; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  #modal .card { max-width: 600px; width: 100%; max-height: 90vh; overflow: auto; }
+  details summary { cursor: pointer; color: var(--muted); }
+  input[type=range] { width: 100%; }
+  .tier0 { color: #3ddc84 } .tier1 { color: #4aa3ff } .tier2 { color: #b26bff } .tier3 { color: #ff4d4d }
+</style>
+</head>
+<body>
+<header>
+  <span>День <b id="hDay">1</b>, <b id="hHour">00:00</b></span>
+  <span>Опасность: <b id="hHaz">0%</b>/час</span>
+  <span class="row" style="flex:0 1 260px">⚡ <span class="ebar"><div id="hEbar"></div></span> <b id="hEnergy">100</b></span>
+  <span>На вулкане: <b id="hCrowd">41</b> · ушли: <b id="hLeft">0</b></span>
+  <span>Пул: <b id="hPool"></b></span>
+</header>
+
+<div class="wrap">
+  <canvas id="cv" width="390" height="624"></canvas>
+
+  <div class="side">
+    <div class="card">
+      <h3>Муравей</h3>
+      <div class="row"><span class="big" id="sCarry">0 💎</span><span class="muted" id="sValue">ценность 0</span></div>
+      <div>Глубина: <b id="sDepth">0</b> · Подъём наверх: <b id="sAscent">0⚡</b></div>
+      <div class="muted" id="sEnergyNote"></div>
+      <div class="muted" id="sShare"></div>
+    </div>
+
+    <div class="card" id="actCard">
+      <h3>Заход — действия мгновенные, тратят энергию</h3>
+      <div class="msg" id="msg"></div>
+      <div class="pad">
+        <span></span><button data-dir="up">↑<small id="nUp"></small></button><span></span>
+        <button data-dir="left">←<small id="nLeft"></small></button>
+        <button id="bMineMode" title="Сколько добывать за шаг в жилу">⛏ ×1<small>по одному</small></button>
+        <button data-dir="right">→<small id="nRight"></small></button>
+        <span></span><button data-dir="down">↓<small id="nDown"></small></button><span></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="bEvac" class="danger">⇧ ЭВАКУАЦИЯ</button>
+        <button id="bClimb">Подняться, на сколько хватит</button>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:12px">Шаг в жилу добывает 1 кристалл или всю жилу (переключатель ⛏ в центре, клавиша M). Клавиатура — стрелки.</div>
+    </div>
+
+    <div class="card">
+      <h3>Уйти из игры (время пойдёт, роллы и боты — тоже)</h3>
+      <div class="row">
+        <button data-skip="1">1 ч</button>
+        <button data-skip="3">3 ч</button>
+        <button data-skip="8" class="primary">😴 Сон 8 ч</button>
+        <button id="bFull">До полной энергии</button>
+      </div>
+      <div class="muted" id="skipNote" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Лента вулкана</h3>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <details class="card">
+      <summary>Настройки прототипа</summary>
+      <div id="tuning"></div>
+      <div class="muted" style="margin-top:6px">Меняются сразу; аналитика пересчитывается.</div>
+    </details>
+
+    <div class="card">
+      <h3>Мои сезоны</h3>
+      <div id="stats" class="muted">Пока нет сыгранных сезонов.</div>
+    </div>
+  </div>
+
+  <div class="ana">
+    <div class="card"><h3>Когда взрывается вулкан</h3><div id="aErupt"></div></div>
+    <div class="card"><h3>Энергия и цены действий</h3><div id="aEnergy"></div></div>
+    <div class="card"><h3>Кристаллы по цветам</h3><div id="aTiers"></div></div>
+    <div class="card"><h3>Где какие жилы (шанс цвета по глубине)</h3><div id="aDepth"></div></div>
+    <div class="card"><h3>Текущий сезон — живые цифры</h3><div id="aLive"></div></div>
+  </div>
+</div>
+
+<div id="modal"><div class="card" id="modalBody"></div></div>
+
+<script>
+// PROTOTYPE - NOT FOR PRODUCTION
+// Question: даёт ли модель «мгновенные заходы + энергия + сон» напряжение без необходимости сидеть ночами?
+// Date: 2026-10-05
+
+const W = 15, H = 60, CELL = 26, VIEW_ROWS = 24;
+const TIERS = [
+  { name: 'зелёная', color: '#3ddc84', value: 1 },
+  { name: 'синяя', color: '#4aa3ff', value: 2 },
+  { name: 'фиолетовая', color: '#b26bff', value: 4 },
+  { name: 'красная', color: '#ff4d4d', value: 8 },
+];
+const MIN_VEIN = 3, MAX_VEIN = 10, VEIN_CHANCE = 0.1;
+const BOTS = 40, PICKAXE_USD = 10, FEE = 0.05;
+const DIRS = { left: [-1, 0], right: [1, 0], down: [0, 1], up: [0, -1] };
+
+// Всё, что крутится в «Настройках прототипа»
+const cfg = {
+  eMax: 200, regenHours: 16, // 12.5⚡/ч; запас на подъём не упирается в потолок (см. README, симуляция 2026-10-05)
+  cTunnel: 2, cSoft: 6, cHard: 15, cMine: 5, // cTunnel = и шаг по туннелю, и подъём (одна цена)
+  rollStartDay: 1, hazMult: 1, botMult: 1,
+  payCap: 10, // потолок выплаты, × ставки (10× = $100); 0 = выкл. Остаток уходит в пул следующего сезона
+};
+// вероятность взрыва в час по дням (индекс = день − 1). Дни 1–3 — крошечный риск (вариант А, ~4% взрывов за первые 3 дня), дальше прежняя кривая.
+// rollStartDay > 1 обнуляет дни до него (для сравнения со старой «безопасной зоной»).
+const HAZ_BY_DAY = [0.0005, 0.0005, 0.0007, 0.004, 0.008, 0.015, 0.025, 0.04, 0.06, 0.1];
+
+let S;
+let history = loadHistory();
+let carryOver = 0; // остаток пула, переходящий в следующий сезон
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+function loadHistory() { try { return JSON.parse(localStorage.getItem('dig-proto-v4') || '[]'); } catch (e) { return []; } }
+function saveHistory() { try { localStorage.setItem('dig-proto-v4', JSON.stringify(history)); } catch (e) {} }
+
+function hazardAt(hour) {
+  const day = Math.floor(hour / 24) + 1;
+  if (day < cfg.rollStartDay) return 0;
+  return Math.min(0.5, HAZ_BY_DAY[Math.min(day - 1, HAZ_BY_DAY.length - 1)] * cfg.hazMult);
+}
+function regenPerHour() { return cfg.eMax / cfg.regenHours; }
+function fmtPct(p) { return (p * 100).toFixed(p > 0 && p < 0.01 ? 2 : 1) + '%'; }
+
+function tierWeights(row) {
+  const t = row / H;
+  return [Math.max(0.05, 1 - t), 0.6, t * 0.9, Math.max(0, t - 0.35) * 1.4];
+}
+function pickTier(row) {
+  const w = tierWeights(row);
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < 4; i++) { r -= w[i]; if (r <= 0) return i; }
+  return 3;
+}
+
+function newSeason() {
+  const grid = [];
+  for (let r = 0; r < H; r++) {
+    const row = [];
+    for (let c = 0; c < W; c++) {
+      const cell = { dug: false, seen: false, hard: Math.random() < 0.15 + 0.5 * r / H, vein: null };
+      if (r > 1 && Math.random() < VEIN_CHANCE) {
+        const size = MIN_VEIN + Math.floor(Math.random() * (MAX_VEIN - MIN_VEIN + 1));
+        cell.vein = { tier: pickTier(r), size, left: size, est: Math.max(1, Math.round(size * (0.7 + Math.random() * 0.6))) };
+      }
+      row.push(cell);
+    }
+    grid.push(row);
+  }
+  grid[0][7].dug = true;
+  const bots = [];
+  for (let i = 0; i < BOTS; i++) {
+    const greedy = Math.random() < 0.15;
+    bots.push({
+      name: 'Муравей-' + (100 + Math.floor(Math.random() * 900)),
+      rate: 0.6 + Math.random() * 0.8,
+      exit: greedy ? 99999 : 24 * (1 + 8 * Math.pow(Math.random(), 0.9)),
+      left: false,
+    });
+  }
+  S = {
+    carryIn: carryOver, time: 0, erupted: false, eruptHour: null, grid, ant: [7, 0], carry: 0, value: 0, maxDepth: 0,
+    energy: cfg.eMax, evacuated: false, evacHour: null, bots, feed: [], valueAt: [0],
+    mined: [0, 0, 0, 0], spent: { dig: 0, tunnel: 0, mine: 0, ascend: 0 }, wasted: 0,
+    sessions: 0, actedThisSession: false, actions: 0, skipping: false,
+  };
+  reveal(7, 0);
+  log('Сезон начался. Роллы на взрыв — каждый час с ' + cfg.rollStartDay + '-го дня.');
+  renderAnalyticsStatic();
+}
+
+// ~60–100 ценности в сутки у среднего бота — уровень хорошего игрока при 300⚡/сутки
+function bValue(b, t) { return cfg.botMult * b.rate * 2.5 * t * (1 + t / 400); }
+
+function reveal(c, r) {
+  for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < H && cc >= 0 && cc < W) S.grid[rr][cc].seen = true;
+  }
+}
+function log(msg) { S.feed.unshift(fmtTime(S.time) + ' — ' + msg); if (S.feed.length > 100) S.feed.pop(); }
+function fmtTime(h) {
+  const d = Math.floor(h / 24) + 1, hh = Math.floor(h % 24), mm = Math.floor((h % 1) * 60);
+  return 'д' + d + ' ' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+function say(text) { $('msg').textContent = text; }
+
+function ascentPath() {
+  const key = (c, r) => r * W + c;
+  const prev = new Map(), q = [S.ant.slice()];
+  prev.set(key(...S.ant), null);
+  while (q.length) {
+    const [c, r] = q.shift();
+    if (r === 0) {
+      const path = []; let k = key(c, r);
+      while (k !== null) { path.unshift([k % W, Math.floor(k / W)]); k = prev.get(k); }
+      return path;
+    }
+    for (const [dc, dr] of Object.values(DIRS)) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nc >= W || nr < 0 || nr >= H) continue;
+      if (!S.grid[nr][nc].dug || prev.has(key(nc, nr))) continue;
+      prev.set(key(nc, nr), key(c, r)); q.push([nc, nr]);
+    }
+  }
+  return [S.ant.slice()];
+}
+function ascentCells() { return Math.max(0, ascentPath().length - 1); }
+function ascentCost() { return ascentCells() * cfg.cTunnel; }
+
+function canAct() { return !S.evacuated && !S.erupted && !S.skipping; }
+function markAction() { S.actions++; if (!S.actedThisSession) { S.actedThisSession = true; S.sessions++; } }
+
+// ---------- действия (мгновенные) ----------
+function doStep(d) {
+  if (!canAct()) return;
+  const [dc, dr] = DIRS[d];
+  const nc = S.ant[0] + dc, nr = S.ant[1] + dr;
+  if (nc < 0 || nc >= W || nr < 1 || nr >= H) { say('Туда нельзя.'); return; }
+  const cell = S.grid[nr][nc];
+  if (cell.vein && cell.vein.left > 0) {
+    const v = cell.vein;
+    const can = Math.floor(S.energy / cfg.cMine);
+    if (can < 1) { say('Нет энергии на добычу (нужно ' + cfg.cMine + '⚡ за кристалл).'); return; }
+    const n = mineAll ? Math.min(can, v.left) : 1;
+    S.energy -= n * cfg.cMine; S.spent.mine += n * cfg.cMine;
+    v.left -= n; S.carry += n; S.value += n * TIERS[v.tier].value; S.mined[v.tier] += n;
+    markAction();
+    if (v.left <= 0) { cell.dug = true; log('Жила выработана: +' + n + ' (' + TIERS[v.tier].name + ')'); say('+' + n + ' 💎 ' + TIERS[v.tier].name + '. Жила пуста.'); }
+    else {
+      if (mineAll) log('Добыто ' + n + ' из жилы (' + TIERS[v.tier].name + '), осталось ' + v.left);
+      say('+' + n + ' 💎 ' + TIERS[v.tier].name + '. В жиле осталось ' + v.left + (mineAll ? ' — энергия кончилась.' : '. Ещё шаг туда — ещё кристалл.'));
+    }
+    return;
+  }
+  const cost = cell.dug ? cfg.cTunnel : (cell.hard ? cfg.cHard : cfg.cSoft);
+  if (S.energy < cost) { say('Не хватает энергии: нужно ' + cost + '⚡, есть ' + Math.floor(S.energy) + '.'); return; }
+  S.energy -= cost;
+  if (cell.dug) S.spent.tunnel += cost; else S.spent.dig += cost;
+  S.ant = [nc, nr]; cell.dug = true; reveal(nc, nr);
+  S.maxDepth = Math.max(S.maxDepth, nr);
+  markAction(); say('');
+}
+
+function evacuate() {
+  if (!canAct()) return;
+  const cost = ascentCost();
+  if (S.energy < cost) { say('На подъём нужно ' + cost + '⚡, есть ' + Math.floor(S.energy) + '. Можно подняться частично.'); return; }
+  S.energy -= cost; S.spent.ascend += cost;
+  S.ant = [S.ant[0], 0]; S.evacuated = true; S.evacHour = S.time;
+  markAction();
+  log('⇧ ЭВАКУАЦИЯ: наверху с ' + S.carry + ' 💎 (ценность ' + S.value + ')');
+  say('Ты наверху. Добыча в безопасности.');
+}
+
+function climbPartial() {
+  if (!canAct()) return;
+  const path = ascentPath();
+  const n = Math.min(path.length - 1, Math.floor(S.energy / cfg.cTunnel));
+  if (n < 1) { say('Нет энергии даже на одну клетку подъёма.'); return; }
+  if (n === path.length - 1) { evacuate(); return; }
+  S.energy -= n * cfg.cTunnel; S.spent.ascend += n * cfg.cTunnel;
+  S.ant = path[n].slice();
+  markAction();
+  log('Поднялся на ' + n + ' клеток (глубина ' + S.ant[1] + ')');
+  say('Поднялся на ' + n + '. До выхода ещё ' + ascentCost() + '⚡.');
+}
+
+// ---------- время между заходами ----------
+function passTime(hours) {
+  if (S.erupted || S.skipping) return;
+  S.skipping = true; S.actedThisSession = false; say('');
+  const target = S.time + hours;
+  log('Ушёл на ' + hours.toFixed(1) + ' ч');
+  const tick = () => {
+    const stepH = S.evacuated ? 2 : 0.25;
+    const next = Math.min(target, S.time + stepH);
+    advanceClock(next);
+    if (S.erupted) { S.skipping = false; return; }
+    if (S.time < target - 1e-9) requestAnimationFrame(tick);
+    else { S.skipping = false; log('Вернулся. ⚡ ' + Math.floor(S.energy) + '/' + cfg.eMax); }
+  };
+  requestAnimationFrame(tick);
+}
+
+function advanceClock(to) {
+  while (S.time < to - 1e-9 && !S.erupted) {
+    const nextInt = Math.floor(S.time + 1e-9) + 1;
+    const until = Math.min(to, nextInt);
+    const dh = until - S.time;
+    // энергия: восстановление с потолком, излишек — «сгорел на потолке»
+    const gain = dh * regenPerHour();
+    const room = cfg.eMax - S.energy;
+    if (gain > room) { if (!S.evacuated) S.wasted += gain - room; S.energy = cfg.eMax; } else S.energy += gain;
+    S.time = until;
+    for (const b of S.bots) if (!b.left && b.exit <= S.time) { b.left = true; log(b.name + ' эвакуировался с ' + Math.round(bValue(b, b.exit))); }
+    if (Math.abs(S.time - nextInt) < 1e-9) {
+      S.time = nextInt;
+      S.valueAt[nextInt] = S.value;
+      roll(nextInt);
+    }
+  }
+}
+
+function roll(hour) {
+  const p = hazardAt(hour);
+  if (p <= 0) return;
+  if (Math.random() < p) {
+    S.erupted = true; S.eruptHour = hour;
+    log('💥 ВЗРЫВ! (шанс был ' + fmtPct(p) + ')');
+    setTimeout(endSeason, 400);
+  } else if (hour % 6 === 0) log('✓ Ролл — вулкан держится (' + fmtPct(p) + ')');
+}
+
+// ---------- деньги ----------
+function basePool() { return (BOTS + 1) * PICKAXE_USD * (1 - FEE); }
+function poolUsd() { return basePool() + (S ? S.carryIn : 0); }
+function capUsd() { return cfg.payCap > 0 ? cfg.payCap * PICKAXE_USD : Infinity; }
+function payoutFor(value, eruptHour) {
+  let total = value;
+  for (const b of S.bots) if (b.exit < eruptHour) total += bValue(b, b.exit);
+  return total > 0 ? Math.min(capUsd(), poolUsd() * value / total) : 0;
+}
+function currentShareEstimate() {
+  let total = S.value;
+  for (const b of S.bots) if (b.left) total += bValue(b, b.exit);
+  return total > 0 ? Math.min(capUsd(), poolUsd() * S.value / total) : 0;
+}
+
+// Итог сезона по всем участникам: выжившие делят пул пропорционально поинтам (с потолком), сгоревшие — 0.
+function seasonLeaderboard() {
+  const E = S.eruptHour, rows = [];
+  rows.push({ name: 'Ты', me: true, out: S.evacuated ? S.evacHour : null, pts: S.evacuated ? S.value : (S.valueAt[E] !== undefined ? S.valueAt[E] : S.value) });
+  for (const b of S.bots) rows.push({ name: b.name, out: b.exit < E ? b.exit : null, pts: Math.round(bValue(b, b.exit < E ? b.exit : E)) });
+  const total = rows.filter(r => r.out !== null).reduce((a, r) => a + r.pts, 0);
+  let paid = 0;
+  for (const r of rows) {
+    r.pay = r.out !== null && total > 0 ? Math.min(capUsd(), poolUsd() * r.pts / total) : 0;
+    paid += r.pay;
+  }
+  rows.sort((a, b) => b.pay - a.pay || (b.out !== null) - (a.out !== null) || b.pts - a.pts);
+  return { rows, paid, leftover: Math.max(0, poolUsd() - paid) };
+}
+
+function endSeason() {
+  const survived = S.evacuated;
+  const payout = survived ? payoutFor(S.value, S.eruptHour) : 0;
+  const valAtErupt = S.valueAt[S.eruptHour] !== undefined ? S.valueAt[S.eruptHour] : S.value;
+  const could = payoutFor(valAtErupt, S.eruptHour);
+  const survivors = S.bots.filter(b => b.exit < S.eruptHour).length + (survived ? 1 : 0);
+  const lb = seasonLeaderboard();
+  carryOver = lb.leftover;
+  let board = '<div style="max-height:260px;overflow:auto"><table><tr><th>#</th><th>Игрок</th><th>Вышел</th><th>Поинты</th><th>Забрал</th><th>Чистыми</th></tr>';
+  lb.rows.forEach((r, i) => {
+    board += '<tr' + (r.me ? ' style="color:var(--accent);font-weight:700"' : (r.out === null ? ' class="muted"' : '')) + '><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' +
+      (r.out === null ? '💥 сгорел' : fmtTime(r.out)) + '</td><td>' + r.pts + '</td><td>$' + r.pay.toFixed(2) + '</td><td>' + (r.pay >= PICKAXE_USD ? '+' : '') + (r.pay - PICKAXE_USD).toFixed(2) + '</td></tr>';
+  });
+  board += '</table></div><div class="muted">Пул $' + poolUsd().toFixed(2) + (S.carryIn ? ' (из них переходящий $' + S.carryIn.toFixed(2) + ')' : '') +
+    ' · выплачено $' + lb.paid.toFixed(2) + ' · в пул следующего сезона $' + lb.leftover.toFixed(2) +
+    (cfg.payCap > 0 ? ' · потолок $' + capUsd().toFixed(0) + ' на игрока' : '') + '</div>';
+  let bestBot = null;
+  for (const b of S.bots) if (b.exit < S.eruptHour && (!bestBot || bValue(b, b.exit) > bValue(bestBot, bestBot.exit))) bestBot = b;
+  const rec = {
+    n: history.length + 1, eruptHour: S.eruptHour, evacHour: survived ? S.evacHour : null,
+    depth: S.maxDepth, value: S.value, survived, payout: Math.round(payout * 100) / 100,
+    could: Math.round(could * 100) / 100, sessions: S.sessions, wasted: Math.round(S.wasted),
+  };
+  history.push(rec); saveHistory();
+  let curve = '<table><tr><th>Выход в</th><th>Ценность</th><th>Забрал бы</th><th>Чистыми</th></tr>';
+  const fromH = Math.min(cfg.rollStartDay * 24 - 24, S.eruptHour);
+  for (let h = fromH; h <= S.eruptHour; h += 12) {
+    const v = S.valueAt[h] !== undefined ? S.valueAt[h] : 0;
+    const pay = payoutFor(v, S.eruptHour);
+    const mine = survived && S.evacHour >= h && S.evacHour < h + 12;
+    curve += '<tr' + (mine ? ' style="color:var(--accent)"' : '') + '><td>' + fmtTime(h) + (mine ? ' ← ты' : '') + '</td><td>' + v + '</td><td>$' + pay.toFixed(2) + '</td><td>' + (pay >= PICKAXE_USD ? '+' : '') + (pay - PICKAXE_USD).toFixed(2) + '</td></tr>';
+    if (h < S.eruptHour && h + 12 > S.eruptHour) h = S.eruptHour - 12;
+  }
+  curve += '</table>';
+  $('modalBody').innerHTML =
+    '<h3>Сезон ' + rec.n + ' окончен</h3>' +
+    '<div class="big">' + (survived ? '✅ Выжил: $' + payout.toFixed(2) + ' (ставка $' + PICKAXE_USD + ')' : '💥 Сгорел') + '</div>' +
+    '<p>Взрыв: <b>' + fmtTime(S.eruptHour) + '</b>. ' + (survived ? 'Ты вышел за <b>' + (S.eruptHour - S.evacHour).toFixed(1) + ' ч</b> до взрыва.' : 'Ты был на глубине ' + S.ant[1] + ' и потерял всё.') + '</p>' +
+    '<p>Если бы успел выйти в час взрыва (ценность ' + valAtErupt + '): <b>$' + could.toFixed(2) + '</b>' + (survived ? ' · ты взял $' + payout.toFixed(2) : '') + '</p>' +
+    '<details open><summary>Лидерборд сезона</summary>' + board + '</details>' +
+    '<details><summary>Сколько забрал бы, если бы вышел в этот час</summary>' + curve + '</details>' +
+    '<p class="muted">Ценность ' + S.value + ' · макс. глубина ' + S.maxDepth + ' · выжили ' + survivors + ' из ' + (BOTS + 1) +
+    (bestBot ? ' · лучший бот вышел ' + fmtTime(bestBot.exit) + ' с ' + Math.round(bValue(bestBot, bestBot.exit)) : '') + '</p>' +
+    '<p class="muted">Заходов: ' + S.sessions + ' · действий: ' + S.actions + ' · энергии сгорело на потолке: ' + Math.round(S.wasted) + '⚡</p>' +
+    statsTable() +
+    '<div class="row" style="margin-top:10px"><button class="primary" id="bNext">Ещё сезон</button></div>';
+  $('modal').style.display = 'flex';
+  $('bNext').onclick = () => { $('modal').style.display = 'none'; newSeason(); };
+  renderStats();
+}
+
+function statsTable() {
+  if (!history.length) return '';
+  let h = '<table><tr><th>#</th><th>Взрыв</th><th>Выход</th><th>Глуб.</th><th>Ценн.</th><th>$</th><th>Мог</th><th>Заходов</th><th>⚡ сгорело</th></tr>';
+  for (const r of history.slice(-10)) {
+    h += '<tr><td>' + r.n + '</td><td>' + fmtTime(r.eruptHour) + '</td><td>' + (r.survived ? fmtTime(r.evacHour) : '💥') + '</td><td>' + r.depth +
+      '</td><td>' + r.value + '</td><td>' + r.payout.toFixed(2) + '</td><td>' + r.could.toFixed(2) + '</td><td>' + r.sessions + '</td><td>' + r.wasted + '</td></tr>';
+  }
+  const total = history.reduce((a, r) => a + r.payout - PICKAXE_USD, 0);
+  return h + '</table><div class="muted">Итог по всем сезонам: ' + (total >= 0 ? '+' : '') + total.toFixed(2) + ' $</div>';
+}
+function renderStats() { $('stats').innerHTML = history.length ? statsTable() : 'Пока нет сыгранных сезонов.'; }
+
+// ---------- аналитика ----------
+function eruptionDistribution() {
+  let surv = 1, mean = 0, cum = 0;
+  const byDay = [], pct = {};
+  for (let h = 1; h <= 24 * 40; h++) {
+    const p = hazardAt(h), e = surv * p, d = Math.floor(h / 24);
+    byDay[d] = (byDay[d] || 0) + e; mean += e * h; cum += e; surv *= 1 - p;
+    for (const m of [0.1, 0.25, 0.5, 0.75, 0.9]) if (pct[m] === undefined && cum >= m) pct[m] = h;
+  }
+  return { byDay, pct, mean };
+}
+
+function renderAnalyticsStatic() {
+  const er = eruptionDistribution();
+  let h = '<div>Роллы каждый час с <b>' + cfg.rollStartDay + '-го дня</b>. Средний взрыв: <b>' + fmtTime(er.mean) + '</b>, медиана <b>' + fmtTime(er.pct[0.5]) + '</b>.</div>';
+  h += '<div>Половина сезонов: <b>' + fmtTime(er.pct[0.25]) + ' – ' + fmtTime(er.pct[0.75]) + '</b>; 80%: <b>' + fmtTime(er.pct[0.1]) + ' – ' + fmtTime(er.pct[0.9]) + '</b>.</div>';
+  h += '<table style="margin-top:6px"><tr><th>День</th><th>Шанс/час</th><th>Взрыв в этот день</th><th></th></tr>';
+  const maxP = Math.max(...er.byDay.map(x => x || 0));
+  for (let d = 0; d < 16; d++) {
+    const p = er.byDay[d] || 0;
+    if (d > 8 && p < 0.002) continue;
+    h += '<tr><td>д' + (d + 1) + '</td><td>' + fmtPct(hazardAt(d * 24 + 1)) + '</td><td>' + (p * 100).toFixed(1) + '%</td><td style="width:90px"><div class="bar" style="width:' + (maxP ? 100 * p / maxP : 0) + '%"></div></td></tr>';
+  }
+  $('aErupt').innerHTML = h + '</table>';
+
+  const rph = regenPerHour();
+  $('aEnergy').innerHTML = '<table>' +
+    '<tr><td>Максимум энергии</td><td>' + cfg.eMax + '⚡</td></tr>' +
+    '<tr><td>Полное восстановление</td><td>' + cfg.regenHours + ' ч (' + rph.toFixed(1) + '⚡/ч)</td></tr>' +
+    '<tr><td>Максимум энергии за сутки</td><td>' + Math.round(rph * 24) + '⚡ (' + (24 / cfg.regenHours).toFixed(1) + ' полных шкалы)</td></tr>' +
+    '<tr><td>Копать мягкую / твёрдую</td><td>' + cfg.cSoft + ' / ' + cfg.cHard + '⚡</td></tr>' +
+
+    '<tr><td>Добыть 1 кристалл</td><td>' + cfg.cMine + '⚡</td></tr>' +
+    '<tr><td>Шаг по туннелю = подъём, за клетку</td><td>' + cfg.cTunnel + '⚡</td></tr>' +
+    '<tr><td>Подъём с глубины 20 / 40 / 55 (прямо)</td><td>' + 20 * cfg.cTunnel + ' / ' + 40 * cfg.cTunnel + ' / ' + 55 * cfg.cTunnel + '⚡</td></tr>' +
+    '<tr><td>Одна полная шкала = мягких клеток / кристаллов</td><td>' + Math.floor(cfg.eMax / cfg.cSoft) + ' / ' + Math.floor(cfg.eMax / cfg.cMine) + '</td></tr>' +
+    '<tr><td>Шанс твёрдой породы на глубине 0 / 30 / 59</td><td>15% / 40% / 64%</td></tr>' +
+    '<tr><td>Игроков / кирка / комиссия / пул</td><td>' + (BOTS + 1) + ' / $' + PICKAXE_USD + ' / ' + FEE * 100 + '% / $' + basePool().toFixed(2) + '</td></tr>' +
+    '<tr><td>Переходящий пул / потолок выплаты</td><td>$' + (S ? S.carryIn : 0).toFixed(2) + ' / ' + (cfg.payCap > 0 ? '$' + capUsd().toFixed(0) : 'выкл') + '</td></tr>' +
+    '<tr><td>Боты уходят</td><td>д1–д9, 15% сидят до взрыва</td></tr></table>';
+
+  let t = '<table><tr><th>Цвет</th><th>За 1 💎</th><th>Жила, шт</th><th>Жила, ценн.</th><th>⚡ на жилу</th><th>Ценн. за 10⚡</th></tr>';
+  TIERS.forEach((tr, i) => {
+    t += '<tr><td class="tier' + i + '">' + tr.name + '</td><td>' + tr.value + '</td><td>' + MIN_VEIN + '–' + MAX_VEIN + '</td><td>' + MIN_VEIN * tr.value + '–' + MAX_VEIN * tr.value +
+      '</td><td>' + MIN_VEIN * cfg.cMine + '–' + MAX_VEIN * cfg.cMine + '</td><td>' + (10 * tr.value / cfg.cMine).toFixed(1) + '</td></tr>';
+  });
+  $('aTiers').innerHTML = t + '</table><div class="muted" style="margin-top:4px">«~N» на карте — оценка размера ±30%. Жила в ' + VEIN_CHANCE * 100 + '% клеток (с 3-го ряда).</div>';
+
+  let d = '<table><tr><th>Глубина</th>' + TIERS.map((tr, i) => '<th class="tier' + i + '">' + tr.name.slice(0, 4) + '</th>').join('') + '<th>Ср. ценн. жилы</th></tr>';
+  for (const [a, b] of [[2, 15], [15, 30], [30, 45], [45, 60]]) {
+    const acc = [0, 0, 0, 0];
+    for (let r = a; r < b; r++) { const w = tierWeights(r), sum = w.reduce((x, y) => x + y, 0); w.forEach((x, i) => acc[i] += x / sum / (b - a)); }
+    const avg = acc.reduce((s2, x, i) => s2 + x * TIERS[i].value, 0) * (MIN_VEIN + MAX_VEIN) / 2;
+    d += '<tr><td>' + a + '–' + (b - 1) + '</td>' + acc.map(x => '<td>' + Math.round(x * 100) + '%</td>').join('') + '<td>' + avg.toFixed(0) + '</td></tr>';
+  }
+  $('aDepth').innerHTML = d + '</table>';
+}
+
+function chanceWithin(hours) {
+  let surv = 1;
+  for (let h = Math.floor(S.time) + 1; h <= Math.floor(S.time + hours); h++) surv *= 1 - hazardAt(h);
+  return 1 - surv;
+}
+
+let liveTick = 0;
+function renderAnalyticsLive(now) {
+  if (now - liveTick < 250) return;
+  liveTick = now;
+  const sp = S.spent, spentTotal = sp.dig + sp.tunnel + sp.mine + sp.ascend;
+  const pct = x => spentTotal ? Math.round(100 * x / spentTotal) + '%' : '—';
+  const leftBots = S.bots.filter(b => b.left);
+  const onV = S.bots.filter(b => !b.left);
+  const avgOn = onV.length ? onV.reduce((a, b) => a + bValue(b, S.time), 0) / onV.length : 0;
+  const asc = ascentCost();
+  let h = '<table>' +
+    '<tr><td>Прошло</td><td>' + S.time.toFixed(1) + ' ч (' + fmtTime(S.time) + ')</td></tr>' +
+    '<tr><td>Шанс взрыва за следующие 8 ч (сон)</td><td><b>' + (chanceWithin(8) * 100).toFixed(1) + '%</b></td></tr>' +
+    '<tr><td>Шанс взрыва за 24 ч</td><td>' + (chanceWithin(24) * 100).toFixed(1) + '%</td></tr>' +
+    '<tr><td>Энергия сейчас / нужно на подъём</td><td>' + Math.floor(S.energy) + ' / <b style="color:' + (S.energy >= asc ? 'var(--ok)' : 'var(--danger)') + '">' + asc + '</b>⚡</td></tr>' +
+    '<tr><td>Ценность / за 10⚡ потраченной</td><td>' + S.value + ' / ' + (spentTotal ? (10 * S.value / spentTotal).toFixed(1) : '0') + '</td></tr>' +
+    '<tr><td>Добыто по цветам</td><td>' + S.mined.map((n, i) => '<span class="tier' + i + '">' + n + '</span>').join(' / ') + '</td></tr>' +
+    '<tr><td>⚡: копал / туннель / добыча / подъём</td><td>' + pct(sp.dig) + ' / ' + pct(sp.tunnel) + ' / ' + pct(sp.mine) + ' / ' + pct(sp.ascend) + '</td></tr>' +
+    '<tr><td>⚡ потрачено / сгорело на потолке</td><td>' + Math.round(spentTotal) + ' / ' + Math.round(S.wasted) + '</td></tr>' +
+    '<tr><td>Заходов / действий</td><td>' + S.sessions + ' / ' + S.actions + '</td></tr>' +
+    '<tr><td>Ушли боты / их ценность</td><td>' + leftBots.length + ' / ' + Math.round(leftBots.reduce((a, b) => a + bValue(b, b.exit), 0)) + '</td></tr>' +
+    '<tr><td>Средний бот на вулкане сейчас</td><td>' + Math.round(avgOn) + '</td></tr>' +
+    '<tr><td>Твоя доля, если выйти и рванёт сразу</td><td>$' + currentShareEstimate().toFixed(2) + '</td></tr></table>';
+  if (S.evacuated) h += '<div class="muted">Ты наверху с ' + fmtTime(S.evacHour) + '.</div>';
+  $('aLive').innerHTML = h;
+}
+
+// ---------- настройки ----------
+const TUNE = [
+  ['eMax', 'Максимум энергии', 40, 300, 10],
+  ['regenHours', 'Часов на полное восстановление', 2, 24, 1],
+  ['cSoft', 'Цена: мягкая порода', 1, 20, 1],
+  ['cHard', 'Цена: твёрдая порода', 2, 40, 1],
+  ['cTunnel', 'Цена: шаг по туннелю = подъём', 0, 10, 0.5],
+  ['cMine', 'Цена: 1 кристалл', 1, 20, 1],
+  ['rollStartDay', 'Роллы с дня', 1, 10, 1],
+  ['hazMult', 'Множитель опасности', 0.25, 3, 0.25],
+  ['botMult', 'Сила ботов', 0.25, 3, 0.25],
+  ['payCap', 'Потолок выплаты, × ставки (0 = выкл)', 0, 20, 1],
+];
+$('tuning').innerHTML = TUNE.map(([k, label, min, max, step]) =>
+  '<div style="margin-top:6px">' + label + ': <b id="v_' + k + '">' + cfg[k] + '</b><br><input type="range" id="t_' + k + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + cfg[k] + '"></div>').join('');
+TUNE.forEach(([k]) => $('t_' + k).oninput = () => {
+  cfg[k] = +$('t_' + k).value; $('v_' + k).textContent = cfg[k];
+  if (k === 'eMax') S.energy = Math.min(S.energy, cfg.eMax);
+  renderAnalyticsStatic();
+});
+
+// ---------- отрисовка ----------
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rockColor(r, hard) {
+  const t = r / H, k = hard ? 0.75 : 1;
+  return 'rgb(' + (lerp(42, 70, t) * k | 0) + ',' + (lerp(47, 28, t) * k | 0) + ',' + (lerp(58, 20, t) * k | 0) + ')';
+}
+let camRow = 0;
+function draw() {
+  const target = Math.max(0, Math.min(H - VIEW_ROWS, S.ant[1] - 9));
+  camRow += (target - camRow) * 0.15;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const r0 = Math.floor(camRow), off = (camRow - r0) * CELL;
+  for (let vr = -1; vr <= VIEW_ROWS + 1; vr++) {
+    const r = r0 + vr; if (r < 0 || r >= H) continue;
+    const y = vr * CELL - off;
+    for (let c = 0; c < W; c++) {
+      const cell = S.grid[r][c], x = c * CELL;
+      if (r === 0) { ctx.fillStyle = '#4a5866'; ctx.fillRect(x, y, CELL, CELL); continue; }
+      if (cell.dug) { ctx.fillStyle = '#6b5442'; ctx.fillRect(x, y, CELL, CELL); }
+      else if (!cell.seen) { ctx.fillStyle = '#0e0c0b'; ctx.fillRect(x, y, CELL, CELL); }
+      else {
+        ctx.fillStyle = rockColor(r, cell.hard); ctx.fillRect(x, y, CELL, CELL);
+        if (cell.hard) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 6, y + 6, 4, 4); ctx.fillRect(x + 15, y + 14, 5, 5); }
+      }
+      if (cell.seen && cell.vein && cell.vein.left > 0) {
+        const tier = TIERS[cell.vein.tier];
+        const g = ctx.createRadialGradient(x + CELL / 2, y + CELL / 2, 2, x + CELL / 2, y + CELL / 2, CELL * 0.75);
+        g.addColorStop(0, tier.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - 6, y - 6, CELL + 12, CELL + 12);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText('~' + (cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est), x + CELL / 2, y + CELL / 2 + 4);
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(x + .5, y + .5, CELL - 1, CELL - 1);
+    }
+  }
+  const haz = hazardAt(Math.floor(S.time) + 1);
+  const glow = Math.min(0.85, 0.15 + haz * 9);
+  const g2 = ctx.createLinearGradient(0, Math.min(cv.height, (H - camRow) * CELL) - 220, 0, cv.height);
+  g2.addColorStop(0, 'rgba(255,80,20,0)'); g2.addColorStop(1, 'rgba(255,80,20,' + glow + ')');
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, cv.width, cv.height);
+  const ax = S.ant[0] * CELL + CELL / 2, ay = (S.ant[1] - camRow) * CELL + CELL / 2;
+  ctx.fillStyle = S.energy < 1 ? '#8a6a52' : '#ff8a3d';
+  ctx.beginPath(); ctx.ellipse(ax, ay + 2, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ax, ay - 6, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1.5;
+  for (const s of [-1, 1]) for (const k of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(ax + s * 5, ay + 2 + k / 2); ctx.lineTo(ax + s * 10, ay + 5 + k); ctx.stroke(); }
+  if (S.skipping) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Время идёт… ' + fmtTime(S.time), cv.width / 2, 30); }
+  if (S.erupted) { ctx.fillStyle = 'rgba(255,60,20,.55)'; ctx.fillRect(0, 0, cv.width, cv.height); }
+}
+
+function neighborInfo(d) {
+  const [dc, dr] = DIRS[d];
+  const nc = S.ant[0] + dc, nr = S.ant[1] + dr;
+  if (nc < 0 || nc >= W || nr < 1 || nr >= H) return 'край';
+  const cell = S.grid[nr][nc];
+  if (cell.vein && cell.vein.left > 0) {
+    const n = cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est;
+    return TIERS[cell.vein.tier].name.slice(0, 4) + ' ~' + n + ' · ' + (mineAll ? n * cfg.cMine + '⚡ всё' : cfg.cMine + '⚡/шт');
+  }
+  if (cell.dug) return 'туннель · ' + cfg.cTunnel + '⚡';
+  return (cell.hard ? 'твёрдая · ' + cfg.cHard : 'мягкая · ' + cfg.cSoft) + '⚡';
+}
+
+function updateUI() {
+  $('hDay').textContent = Math.floor(S.time / 24) + 1;
+  $('hHour').textContent = String(Math.floor(S.time % 24)).padStart(2, '0') + ':' + String(Math.floor((S.time % 1) * 60)).padStart(2, '0');
+  const haz = hazardAt(Math.floor(S.time) + 1);
+  $('hHaz').textContent = fmtPct(haz);
+  $('hHaz').style.color = haz === 0 ? 'var(--ok)' : haz < 0.02 ? '#ffd166' : 'var(--danger)';
+  $('hEnergy').textContent = Math.floor(S.energy) + '/' + cfg.eMax;
+  $('hPool').textContent = '$' + poolUsd().toFixed(0) + (S.carryIn ? ' (+' + S.carryIn.toFixed(0) + ' перех.)' : '');
+  $('hEbar').style.width = (100 * S.energy / cfg.eMax) + '%';
+  const left = S.bots.filter(b => b.left).length;
+  $('hCrowd').textContent = (BOTS - left) + (S.evacuated ? 0 : 1);
+  $('hLeft').textContent = left + (S.evacuated ? 1 : 0);
+  $('sCarry').textContent = S.carry + ' 💎';
+  $('sValue').textContent = 'ценность ' + S.value;
+  $('sDepth').textContent = S.ant[1];
+  const asc = ascentCost();
+  $('sAscent').textContent = S.evacuated ? 'наверху' : asc + '⚡';
+  $('sAscent').style.color = !S.evacuated && S.energy < asc ? 'var(--danger)' : '';
+  const toFull = (cfg.eMax - S.energy) / regenPerHour();
+  $('sEnergyNote').textContent = S.evacuated ? 'Эвакуирован в ' + fmtTime(S.evacHour) + '. Ждём взрыва.' :
+    (S.energy < 1 ? 'Энергия кончилась — муравей спит. ' : '') + 'Полная энергия через ' + toFull.toFixed(1) + ' ч.' +
+    (S.energy < asc ? ' ⚠️ Сейчас НЕ хватает энергии на эвакуацию.' : '');
+  $('sShare').textContent = S.value ? 'Доля, если выйти сейчас и рванёт сразу: ~$' + currentShareEstimate().toFixed(2) : '';
+  for (const [d, id] of [['up', 'nUp'], ['down', 'nDown'], ['left', 'nLeft'], ['right', 'nRight']]) { const v = neighborInfo(d); if ($(id).textContent !== v) $(id).textContent = v; }
+  const off = !canAct();
+  document.querySelectorAll('[data-dir]').forEach(b => b.disabled = off);
+  $('bEvac').disabled = off; $('bClimb').disabled = off;
+  $('bEvac').textContent = '⇧ ЭВАКУАЦИЯ (' + asc + '⚡)';
+  document.querySelectorAll('[data-skip]').forEach(b => b.disabled = S.skipping || S.erupted);
+  $('bFull').disabled = S.skipping || S.erupted || S.energy >= cfg.eMax - 0.5;
+  $('skipNote').textContent = S.evacuated ? 'Ты наверху — промотай время до взрыва.' :
+    'Сон 8 ч: шанс взрыва за это время ' + (chanceWithin(8) * 100).toFixed(1) + '%. Ты на глубине ' + S.ant[1] + (S.energy >= asc ? ' (на подъём энергии хватает).' : ' (на подъём энергии НЕ хватает).');
+  const html = S.feed.slice(0, 40).map(l => '<div>' + l + '</div>').join('');
+  if ($('feed').dataset.v !== html) { $('feed').innerHTML = html; $('feed').dataset.v = html; }
+}
+
+// ---------- ввод ----------
+document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => doStep(b.dataset.dir));
+document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => passTime(S.evacuated ? 24 : +b.dataset.skip));
+$('bFull').onclick = () => passTime(Math.max(0.25, (cfg.eMax - S.energy) / regenPerHour()));
+$('bEvac').onclick = evacuate;
+$('bClimb').onclick = climbPartial;
+let mineAll = false;
+function toggleMine() { mineAll = !mineAll; $('bMineMode').innerHTML = mineAll ? '⛏ всё<small>вся жила</small>' : '⛏ ×1<small>по одному</small>'; }
+$('bMineMode').onclick = toggleMine;
+window.addEventListener('keydown', e => {
+  const m = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'up' };
+  if (m[e.key]) { doStep(m[e.key]); e.preventDefault(); }
+  if (e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') toggleMine();
+});
+
+function frame(now) {
+  draw(); updateUI(); renderAnalyticsLive(now);
+  requestAnimationFrame(frame);
+}
+
+newSeason();
+renderStats();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
