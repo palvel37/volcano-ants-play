@@ -1,0 +1,744 @@
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: делают ли пещеры (железные стены, сторож на входе, опасные зоны, осколки → инструменты, помощь друзей) заход глубже и интереснее, не превращаясь в лабиринт-рутину? -->
+<!-- Date: 2026-10-07 -->
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вулкан — подземелье v5</title>
+<style>
+  :root { --bg:#14110f; --panel:#1e1a17; --line:#3a322c; --text:#f1e7dc; --muted:#a8998b; --accent:#ff8a3d; --danger:#ff4d4d; --ok:#3ddc84; --energy:#ffd166; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header b { color: var(--accent); }
+  .wrap { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 16px; align-items: flex-start; }
+  canvas { background: #000; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; touch-action: manipulation; }
+  canvas.help { cursor: crosshair; border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok); }
+  .side { flex: 1 1 320px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button { background: #2c2520; color: var(--text); border: 1px solid #4a3f37; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; min-height: 40px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #1a0f08; border-color: var(--accent); font-weight: 700; }
+  button.danger { background: #5a1a1a; border-color: var(--danger); }
+  button.on { background: #1d3b2a; border-color: var(--ok); }
+  button:disabled { opacity: .4; cursor: default; }
+  .big { font-size: 20px; font-weight: 700; }
+  .muted { color: var(--muted); }
+  .feed { max-height: 160px; overflow: auto; font-size: 12px; color: var(--muted); }
+  .pad { display: grid; grid-template-columns: repeat(3, 96px); gap: 6px; margin-top: 8px; }
+  .pad button { min-height: 60px; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; }
+  .pad small { font-size: 10px; color: var(--muted); line-height: 1.1; margin-top: 2px; }
+  .ebar { height: 12px; background: #2c2520; border-radius: 6px; overflow: hidden; min-width: 120px; flex: 1; }
+  .ebar div { height: 100%; background: var(--energy); }
+  .msg { min-height: 20px; color: var(--energy); font-size: 13px; }
+  .tool { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .tool .bar { flex: 1; height: 8px; background: #2c2520; border-radius: 4px; overflow: hidden; }
+  .tool .bar div { height: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border-bottom: 1px solid var(--line); padding: 2px 4px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  #modal .card { max-width: 600px; width: 100%; max-height: 90vh; overflow: auto; }
+  details summary { cursor: pointer; color: var(--muted); }
+  input[type=range] { width: 100%; }
+  #mbar { display: none; }
+  @media (max-width: 760px) {
+    body { font-size: 13px; padding-bottom: calc(var(--mbar-h, 170px) + env(safe-area-inset-bottom)); }
+    header { gap: 2px 10px; padding: 6px 10px; font-size: 12px; }
+    header .ebar { min-width: 80px; }
+    .hide-m { display: none !important; }
+    .wrap { padding: 6px 8px; gap: 10px; }
+    canvas { width: 100%; height: auto; touch-action: none; }
+    .side { max-width: none; }
+    #mbar { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: rgba(20,17,15,.97); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+    #mbar .mmsg { min-height: 18px; font-size: 12px; color: var(--energy); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #mbar .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    #mbar button { min-height: 56px; padding: 2px; font-size: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    #mbar button small { font-size: 9.5px; color: var(--muted); line-height: 1.1; margin-top: 1px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #mbar button:active { transform: scale(.95); }
+    #mbar .skips { display: none; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+    #mbar .skips.open { display: grid; }
+    #mbar .skips button { min-height: 44px; font-size: 14px; }
+  }
+  .tier0 { color: #3ddc84 } .tier1 { color: #4aa3ff } .tier2 { color: #b26bff } .tier3 { color: #ff4d4d }
+</style>
+</head>
+<body>
+<header>
+  <span>День <b id="hDay">1</b>, <b id="hHour">00:00</b></span>
+  <span>Опасность: <b id="hHaz">0%</b>/ч</span>
+  <span class="row" style="flex:0 1 240px">⚡ <span class="ebar"><div id="hEbar"></div></span> <b id="hEnergy">200</b></span>
+  <span class="hide-m">На вулкане: <b id="hCrowd">41</b> · ушли: <b id="hLeft">0</b></span>
+  <span>Пул: <b id="hPool"></b></span>
+</header>
+
+<div class="wrap">
+  <canvas id="cv" width="390" height="624"></canvas>
+
+  <div class="side">
+    <div class="card">
+      <h3>Муравей</h3>
+      <div class="row"><span class="big" id="sCarry">0 💎</span><span class="muted" id="sValue">поинты 0</span></div>
+      <div>Глубина: <b id="sDepth">0</b> · Подъём: <b id="sAscent">0⚡</b> · Сила: <b id="sPower">3</b></div>
+      <div class="muted" id="sNote"></div>
+      <div id="sSess" style="margin-top:4px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Осколки и инструменты</h3>
+      <div id="tools"></div>
+      <div class="muted" style="font-size:12px;margin-top:4px">Осколки не передаются. Сезонные инструменты сгорают с сезоном, вечные остаются.</div>
+    </div>
+
+    <div class="card" id="actCard">
+      <h3>Заход — действия мгновенные</h3>
+      <div class="msg" id="msg"></div>
+      <div class="pad hide-m">
+        <span></span><button data-dir="up">↑<small id="nUp"></small></button><span></span>
+        <button data-dir="left">←<small id="nLeft"></small></button>
+        <button id="bMineMode" title="Сколько добывать за шаг в жилу">⛏ ×1<small>по одному</small></button>
+        <button data-dir="right">→<small id="nRight"></small></button>
+        <span></span><button data-dir="down">↓<small id="nDown"></small></button><span></span>
+      </div>
+      <div class="row hide-m" style="margin-top:8px">
+        <button id="bEvac" class="danger">⇧ ЭВАКУАЦИЯ</button>
+        <button id="bClimb">Подняться, на сколько хватит</button>
+      </div>
+      <div class="row hide-m" style="margin-top:8px">
+        <button id="bHelp">🤝 Помощь друзей</button>
+        <span class="muted" id="helpNote"></span>
+      </div>
+    </div>
+
+    <div class="card hide-m">
+      <h3>Уйти из игры (время пойдёт)</h3>
+      <div class="row">
+        <button data-skip="1">1 ч</button>
+        <button data-skip="3">3 ч</button>
+        <button data-skip="8" class="primary">😴 Сон 8 ч</button>
+        <button id="bFull">До полной энергии</button>
+      </div>
+      <div class="muted" id="skipNote" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Лента вулкана</h3>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <details class="card">
+      <summary>Как читать карту</summary>
+      <div class="muted" style="margin-top:6px;font-size:13px">
+        ⬛ Серая клепаная клетка — <b>железо</b>, не пройти (пробивает только <b>бур</b>).<br>
+        🟥 Красная клетка с рамкой — <b>сторож</b> на входе в комнату: за ним богатые жилы.<br>
+        🟪 Фиолетовый монстр с «!» — <b>агрессивный</b>; красноватые клетки вокруг — его <b>опасная зона</b>: шагнёшь туда — он нападёт.<br>
+        ◆ Цветные ромбики — <b>осколки</b>: жёлтый — фонарь, коричневый — верёвка, голубой — бур.<br>
+        Светящиеся круги — жилы (цвет = ценность, «~N» = примерный размер).<br>
+        🤝 Помощь друзей: нажми кнопку и тапни по скрытой клетке — друг откроет область 3×3 вокруг неё.<br>
+        Тёмная клепаная стена с золотыми заклёпками — <b>стена комнаты</b>: бур её не берёт, вход только через сторожа.
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Настройки прототипа</summary>
+      <div id="tuning"></div>
+    </details>
+
+    <div class="card">
+      <h3>Мои сезоны</h3>
+      <div id="stats" class="muted">Пока нет сыгранных сезонов.</div>
+    </div>
+  </div>
+</div>
+
+<div id="mbar">
+  <div class="mmsg" id="mMsg">Тапни клетку рядом с муравьём или свайпни — шаг туда.</div>
+  <div class="grid">
+    <button id="mHelp">🤝<small id="mHelpN">друзья</small></button>
+    <button id="mMine">⛏<small>×1</small></button>
+    <button data-dir="up">↑<small id="mUp"></small></button>
+    <button id="mClimb">⤒<small>частично</small></button>
+    <button id="mEvac" class="danger">⇧<small id="mEvacC">выход</small></button>
+    <button id="mSleep">😴<small>уйти</small></button>
+    <button data-dir="left">←<small id="mLeft"></small></button>
+    <button data-dir="down">↓<small id="mDown"></small></button>
+    <button data-dir="right">→<small id="mRight"></small></button>
+    <button id="mInfo">ⓘ<small>справка</small></button>
+  </div>
+  <div class="skips" id="mSkips">
+    <button data-skip="1">1 ч</button><button data-skip="3">3 ч</button><button data-skip="8" class="primary">Сон 8 ч</button><button id="mFull">до полной</button>
+  </div>
+</div>
+
+<div id="modal"><div class="card" id="modalBody"></div></div>
+
+<script>
+// PROTOTYPE - NOT FOR PRODUCTION
+// Question: делают ли пещеры, стены, сторожа, опасные зоны, осколки и помощь друзей заход глубже, не превращаясь в рутину?
+// Date: 2026-10-07
+
+const W = 40, H = 200, CELL = 26, VIEW_COLS = 15, START_C = 20;
+let VIEW_ROWS = 24;
+const TIERS = [
+  { name: 'зелёная', color: '#3ddc84', value: 1 },
+  { name: 'синяя', color: '#4aa3ff', value: 2 },
+  { name: 'фиолетовая', color: '#b26bff', value: 4 },
+  { name: 'красная', color: '#ff4d4d', value: 8 },
+];
+const TOOLS = {
+  lantern: { name: 'Фонарь', icon: '🔦', need: 4, color: '#ffd166', perm: false, desc: 'обзор 3 клетки вместо 2' },
+  rope:    { name: 'Верёвка', icon: '🪢', need: 4, color: '#c08a52', perm: false, desc: 'туннель и подъём 1⚡ вместо 2' },
+  drill:   { name: 'Бур', icon: '🛠', need: 6, color: '#5fd3f3', perm: true, desc: 'пробивает железо (новый путь, навсегда)' },
+};
+const BOTS = 40, PICKAXE_USD = 10, FEE = 0.05;
+const DIRS = { left: [-1, 0], right: [1, 0], down: [0, 1], up: [0, -1] };
+const HAZ_BY_DAY = [0.0005, 0.0005, 0.0007, 0.004, 0.008, 0.015, 0.025, 0.04, 0.06, 0.1];
+
+const cfg = {
+  eMax: 1000, regenHours: 16, cSoft: 6, // энергия ×5: полная шкала ≈ 150–200 действий ≈ 10 мин захода (решение Павла 07.10)
+  cHard: 15, cMine: 5, cTunnel: 2, cFight: 10, cDrill: 40,
+  injuryHours: 12, injuryRegen: 0.25, rooms: 35, ironLines: 180, aggroChance: 0.012, cacheChance: 0.012, veinChance: 0.03, powerSlope: 0.05,
+  friendHelps: 3, guardBonus: 3, hazMult: 1, botMult: 1, payCap: 10,
+};
+
+let S, mineAll = false, helpMode = false;
+let history = loadJSON('dungeon-history', []);
+let perm = loadJSON('dungeon-perm', { drill: false }); // вечные инструменты
+let carryOver = 0;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+function loadJSON(k, d) { try { return JSON.parse(localStorage.getItem(k) || JSON.stringify(d)); } catch (e) { return d; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+function hazardAt(hour) { const day = Math.floor(hour / 24); return Math.min(0.5, HAZ_BY_DAY[Math.min(day, HAZ_BY_DAY.length - 1)] * cfg.hazMult); }
+function regenPerHour() { return cfg.eMax / cfg.regenHours; }
+function fmtPct(p) { return (p * 100).toFixed(p > 0 && p < 0.01 ? 2 : 1) + '%'; }
+function fmtTime(h) { const d = Math.floor(h / 24) + 1, hh = Math.floor(h % 24), mm = Math.floor((h % 1) * 60); return 'д' + d + ' ' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function inb(c, r) { return c >= 0 && c < W && r >= 0 && r < H; }
+function tierWeights(row) { const t = row / H; return [Math.max(0.05, 1 - t), 0.6, t * 0.9, Math.max(0, t - 0.35) * 1.4]; }
+function pickTier(row) { const w = tierWeights(row); let x = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < 4; i++) { x -= w[i]; if (x <= 0) return i; } return 3; }
+function monsterPower(r, bonus) { return Math.round(1 + r * cfg.powerSlope + Math.random() * 3 + bonus); }
+function makeVein(r, minTier, mult) {
+  const tier = Math.max(minTier, pickTier(r));
+  const size = Math.round(rnd(3, 10) * mult);
+  return { tier, size, left: size, est: Math.max(1, Math.round(size * (0.7 + Math.random() * 0.6))) };
+}
+function randomShard() { const x = Math.random(); return x < 0.4 ? 'lantern' : x < 0.75 ? 'rope' : 'drill'; }
+
+// ---------- генерация поля ----------
+function generate() {
+  const g = [];
+  for (let r = 0; r < H; r++) {
+    const row = [];
+    for (let c = 0; c < W; c++) row.push({ dug: r === 0, seen: false, hard: Math.random() < 0.15 + 0.45 * r / H, iron: false, vein: null, monster: null, shard: null, room: false });
+    g.push(row);
+  }
+  // комнаты: железные стены, один вход со сторожем, внутри — пещера с богатыми жилами
+  const rooms = [];
+  for (let i = 0, tries = 0; i < cfg.rooms && tries < 400; tries++) {
+    const iw = rnd(3, 5), ih = rnd(3, 4);
+    const band = Math.floor(i / cfg.rooms * (H - 14)) + 8;
+    const r0 = Math.min(H - ih - 3, band + rnd(-3, 3)), c0 = rnd(1, W - iw - 2);
+    if (rooms.some(o => !(c0 + iw + 1 < o.c0 - 1 || o.c0 + o.iw + 1 < c0 - 1 || r0 + ih + 1 < o.r0 - 1 || o.r0 + o.ih + 1 < r0 - 1))) continue;
+    if (Math.abs(c0 + iw / 2 - START_C) < 4 && r0 < 12) continue;
+    rooms.push({ c0, r0, iw, ih }); i++;
+    for (let r = r0 - 1; r <= r0 + ih; r++) for (let c = c0 - 1; c <= c0 + iw; c++) {
+      const cell = g[r][c];
+      const wall = r === r0 - 1 || r === r0 + ih || c === c0 - 1 || c === c0 + iw;
+      if (wall) { cell.iron = true; cell.roomWall = true; } else { cell.room = true; cell.dug = true; cell.hard = false; }
+    }
+    // вход: клетка в стене (не угол), со сторожем
+    const sides = [];
+    for (let c = c0; c < c0 + iw; c++) { sides.push([c, r0 - 1]); sides.push([c, r0 + ih]); }
+    for (let r = r0; r < r0 + ih; r++) { sides.push([c0 - 1, r]); sides.push([c0 + iw, r]); }
+    const [gc, gr] = sides[Math.floor(Math.random() * sides.length)];
+    const gate = g[gr][gc]; gate.iron = false; gate.roomWall = false; gate.monster = { power: monsterPower(gr, cfg.guardBonus), kind: 'guard' };
+    // внутри: 2–3 богатые жилы, иногда осколок
+    const inner = [];
+    for (let r = r0; r < r0 + ih; r++) for (let c = c0; c < c0 + iw; c++) inner.push([c, r]);
+    inner.sort(() => Math.random() - 0.5);
+    const nv = rnd(2, 3);
+    for (let k = 0; k < nv; k++) { const [c, r] = inner[k]; g[r][c].vein = makeVein(r, 2, 1.5); g[r][c].dug = false; }
+    if (Math.random() < 0.6) { const [c, r] = inner[nv]; g[r][c].shard = randomShard(); }
+  }
+  // железные жилы-перегородки (лабиринт)
+  for (let i = 0; i < cfg.ironLines; i++) {
+    let c = rnd(0, W - 1), r = rnd(5, H - 2);
+    const horiz = Math.random() < 0.6, len = rnd(3, 10);
+    for (let k = 0; k < len; k++) {
+      if (!inb(c, r)) break;
+      const cell = g[r][c];
+      if (!cell.room && !cell.monster && !cell.roomWall && !(Math.abs(c - START_C) <= 1 && r < 6)) cell.iron = true;
+      if (horiz) c++; else r++;
+    }
+  }
+  // обычные жилы, агрессивные монстры, осколки в породе
+  for (let r = 2; r < H; r++) for (let c = 0; c < W; c++) {
+    const cell = g[r][c];
+    if (cell.iron || cell.room || cell.monster || cell.dug) continue;
+    const x = Math.random();
+    const vc = cfg.veinChance;
+    if (x < vc) cell.vein = makeVein(r, 0, 1);
+    else if (r >= 6 && x < vc + cfg.aggroChance) cell.monster = { power: monsterPower(r, 1), kind: 'aggro' };
+    else if (r >= 3 && x < vc + cfg.aggroChance + cfg.cacheChance) cell.shard = randomShard();
+  }
+  return g;
+}
+
+function newSeason() {
+  const bots = [];
+  for (let i = 0; i < BOTS; i++) {
+    const greedy = Math.random() < 0.15;
+    bots.push({ name: 'Муравей-' + rnd(100, 999), rate: 0.6 + Math.random() * 0.8, exit: greedy ? 99999 : 24 * (1 + 8 * Math.pow(Math.random(), 0.9)), left: false });
+  }
+  S = {
+    carryIn: carryOver, time: 0, erupted: false, eruptHour: null, grid: generate(), ant: [START_C, 0], carry: 0, value: 0, maxDepth: 0,
+    energy: cfg.eMax, evacuated: false, evacHour: null, bots, feed: [], valueAt: [0], sessions: 0, acted: false, actions: 0, skipping: false,
+    shards: { lantern: 0, rope: 0, drill: 0 }, tools: { lantern: false, rope: false, drill: perm.drill },
+    gear: 0, injuryUntil: 0, fights: { won: 0, lost: 0, ambush: 0 }, helpsLeft: cfg.friendHelps, helpDay: 0, helpsUsed: 0,
+    roomsEntered: 0, valueRooms: 0, ironBroken: 0, wasted: 0, sessStart: null, sessActions: 0, sessEnergy: 0, sessLog: [],
+  };
+  reveal(START_C, 0);
+  log('Сезон начался.' + (perm.drill ? ' У тебя вечный бур 🛠.' : ''));
+}
+
+function bValue(b, t) { return cfg.botMult * b.rate * 2.5 * t * (1 + t / 400); }
+function sightRadius() { return S.tools.lantern ? 3 : 2; }
+function stepCost() { return S.tools.rope ? 1 : cfg.cTunnel; }
+function antPower() { return 3 + S.gear; }
+function winChance(m) { return Math.max(0.05, Math.min(0.95, 0.5 + (antPower() - m.power) * 0.08)); }
+function injured() { return S.time < S.injuryUntil; }
+function reveal(c, r) { const k = sightRadius(); for (let dr = -k; dr <= k; dr++) for (let dc = -k; dc <= k; dc++) if (inb(c + dc, r + dr)) S.grid[r + dr][c + dc].seen = true; }
+function log(m) { S.feed.unshift(fmtTime(S.time) + ' — ' + m); if (S.feed.length > 120) S.feed.pop(); }
+function say(t) { $('msg').textContent = t; const m = $('mMsg'); if (m && t) m.textContent = t; }
+
+// опасная зона: клетки вокруг живого агрессивного монстра (8 соседей)
+function aggroNear(c, r) {
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (!dr && !dc) continue;
+    if (!inb(c + dc, r + dr)) continue;
+    const m = S.grid[r + dr][c + dc].monster;
+    if (m && m.kind === 'aggro') return { m, c: c + dc, r: r + dr };
+  }
+  return null;
+}
+
+function ascentPath() {
+  const key = (c, r) => r * W + c, prev = new Map(), q = [S.ant.slice()];
+  prev.set(key(...S.ant), null);
+  while (q.length) {
+    const [c, r] = q.shift();
+    if (r === 0) { const p = []; let k = key(c, r); while (k !== null) { p.unshift([k % W, Math.floor(k / W)]); k = prev.get(k); } return p; }
+    for (const [dc, dr] of Object.values(DIRS)) {
+      const nc = c + dc, nr = r + dr;
+      if (!inb(nc, nr) || !S.grid[nr][nc].dug || prev.has(key(nc, nr))) continue;
+      prev.set(key(nc, nr), key(c, r)); q.push([nc, nr]);
+    }
+  }
+  return [S.ant.slice()];
+}
+function ascentCost() { return Math.max(0, ascentPath().length - 1) * stepCost(); }
+function canAct() { return !S.evacuated && !S.erupted && !S.skipping; }
+function act() { S.actions++; S.sessActions++; if (!S.acted) { S.acted = true; S.sessions++; S.sessStart = performance.now(); S.sessEnergyStart = S.energy; } }
+function fmtClock(ms) { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function closeSession() {
+  if (S.sessStart === null) return;
+  const ms = performance.now() - S.sessStart, spent = Math.max(0, Math.round(S.sessEnergyStart - S.energy));
+  S.sessLog.push({ ms, actions: S.sessActions });
+  log('⏱ Заход длился ' + fmtClock(ms) + ', действий ' + S.sessActions + ', энергии потрачено ~' + spent);
+  S.sessStart = null; S.sessActions = 0;
+}
+
+function gainShard(type, src) {
+  S.shards[type]++;
+  const t = TOOLS[type];
+  let txt = 'Осколок: ' + t.name.toLowerCase() + ' ' + S.shards[type] + '/' + t.need + ' (' + src + ')';
+  if (!S.tools[type] && S.shards[type] >= t.need) {
+    S.tools[type] = true; txt += ' → собран ' + t.icon + ' ' + t.name + '!';
+    if (t.perm) { perm[type] = true; saveJSON('dungeon-perm', perm); txt += ' (вечный)'; }
+    if (type === 'lantern') reveal(...S.ant);
+  }
+  log(txt); return txt;
+}
+
+function fight(m, where) {
+  const ch = winChance(m);
+  if (Math.random() < ch) {
+    S.fights.won++;
+    const tn = Math.max(1, Math.round(m.power * 0.5)), tt = pickTier(where[1]);
+    S.carry += tn; S.value += tn * TIERS[tt].value;
+    let extra = '';
+    if (m.kind === 'guard' && Math.random() < 0.6) { S.gear++; extra += ' Снаряга +1 (сила ' + antPower() + ').'; }
+    if (Math.random() < (m.kind === 'guard' ? 0.7 : 0.4)) extra += ' ' + gainShard(randomShard(), 'монстр') + '.';
+    log('⚔️ Победа над ' + (m.kind === 'guard' ? 'сторожем' : 'монстром') + ' ' + m.power + ' (шанс ' + Math.round(ch * 100) + '%), трофей +' + tn + ' 💎');
+    return { win: true, text: 'Победа! (шанс ' + Math.round(ch * 100) + '%) Трофей +' + tn + ' 💎.' + extra };
+  }
+  S.fights.lost++;
+  S.injuryUntil = Math.max(S.injuryUntil, S.time) + cfg.injuryHours;
+  log('💀 Поражение от ' + (m.kind === 'guard' ? 'сторожа' : 'монстра') + ' ' + m.power + ' (шанс ' + Math.round(ch * 100) + '%), ранен');
+  return { win: false, text: 'Поражение (шанс ' + Math.round(ch * 100) + '%). Ранен до ' + fmtTime(S.injuryUntil) + ': восстановление ×' + cfg.injuryRegen + '.' };
+}
+
+// ---------- действия ----------
+function doStep(d) {
+  if (!canAct()) return;
+  const [dc, dr] = DIRS[d], nc = S.ant[0] + dc, nr = S.ant[1] + dr;
+  if (!inb(nc, nr) || nr < 1) { say('Туда нельзя.'); return; }
+  const cell = S.grid[nr][nc];
+  if (cell.iron && cell.roomWall) { say('Стену комнаты буром не взять — вход только через сторожа.'); return; }
+  if (cell.iron) {
+    if (!S.tools.drill) { say('Железо — не пройти. Нужен бур (6 осколков).'); return; }
+    if (S.energy < cfg.cDrill) { say('Бурить железо: ' + cfg.cDrill + '⚡, есть ' + Math.floor(S.energy) + '.'); return; }
+    S.energy -= cfg.cDrill; cell.iron = false; cell.dug = true; S.ironBroken++; act();
+    moveInto(nc, nr); say('🛠 Пробил железо (' + cfg.cDrill + '⚡).'); return;
+  }
+  if (cell.monster) {
+    if (S.energy < cfg.cFight) { say('На бой нужно ' + cfg.cFight + '⚡.'); return; }
+    S.energy -= cfg.cFight; act();
+    const m = cell.monster, res = fight(m, [nc, nr]);
+    if (res.win) { cell.monster = null; cell.dug = true; moveInto(nc, nr, true); }
+    say(res.text); return;
+  }
+  if (cell.vein && cell.vein.left > 0) {
+    const v = cell.vein, can = Math.floor(S.energy / cfg.cMine);
+    if (can < 1) { say('Нет энергии на добычу (' + cfg.cMine + '⚡ за кристалл).'); return; }
+    const n = mineAll ? Math.min(can, v.left) : 1;
+    S.energy -= n * cfg.cMine; v.left -= n; S.carry += n; S.value += n * TIERS[v.tier].value; act();
+    if (cell.room) S.valueRooms += n * TIERS[v.tier].value;
+    if (v.left <= 0) { cell.dug = true; log('Жила выработана (' + TIERS[v.tier].name + ')'); say('+' + n + ' 💎. Жила пуста.'); }
+    else say('+' + n + ' 💎 ' + TIERS[v.tier].name + '. Осталось ' + v.left + '.');
+    return;
+  }
+  const cost = cell.dug ? stepCost() : (cell.hard ? cfg.cHard : cfg.cSoft);
+  if (S.energy < cost) { say('Не хватает энергии: нужно ' + cost + '⚡.'); return; }
+  S.energy -= cost; cell.dug = true; act(); say('');
+  moveInto(nc, nr);
+}
+
+function moveInto(c, r, quiet) {
+  const wasRoom = S.grid[S.ant[1]][S.ant[0]].room;
+  S.ant = [c, r]; reveal(c, r); S.maxDepth = Math.max(S.maxDepth, r);
+  const cell = S.grid[r][c];
+  if (cell.room && !wasRoom) { S.roomsEntered++; log('🏛 Вошёл в комнату'); }
+  if (cell.shard) { const t = gainShard(cell.shard, 'тайник'); cell.shard = null; if (!quiet) say(t); }
+  // засада: шагнул в опасную зону агрессивного монстра
+  const a = aggroNear(c, r);
+  if (a) {
+    S.fights.ambush++;
+    const res = fight(a.m, [a.c, a.r]);
+    if (res.win) { S.grid[a.r][a.c].monster = null; }
+    say('⚠️ Засада! ' + res.text);
+  }
+}
+
+function evacuate() {
+  if (!canAct()) return;
+  const cost = ascentCost();
+  if (S.energy < cost) { say('На подъём нужно ' + cost + '⚡. Можно подняться частично.'); return; }
+  S.energy -= cost; S.ant = [S.ant[0], 0]; S.evacuated = true; S.evacHour = S.time; act();
+  log('⇧ ЭВАКУАЦИЯ: наверху с ' + S.value + ' поинтами'); say('Ты наверху. Добыча в безопасности.');
+}
+function climbPartial() {
+  if (!canAct()) return;
+  const p = ascentPath(), n = Math.min(p.length - 1, Math.floor(S.energy / stepCost()));
+  if (n < 1) { say('Нет энергии на подъём.'); return; }
+  if (n === p.length - 1) { evacuate(); return; }
+  S.energy -= n * stepCost(); S.ant = p[n].slice(); act(); say('Поднялся на ' + n + '. До выхода ещё ' + ascentCost() + '⚡.');
+}
+
+// помощь друзей: открыть любую клетку на карте
+function helpAt(c, r) {
+  if (S.helpsLeft < 1) { say('Друзья уже помогли сегодня.'); return; }
+  if (S.grid[r][c].seen) { say('Эта клетка уже открыта — выбери скрытую.'); return; }
+  const found = [];
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (!inb(c + dc, r + dr)) continue;
+    const cell = S.grid[r + dr][c + dc];
+    if (!cell.seen) {
+      if (cell.monster) found.push((cell.monster.kind === 'guard' ? 'сторож ' : 'монстр ') + cell.monster.power);
+      else if (cell.vein && cell.vein.left > 0) found.push(TIERS[cell.vein.tier].name + ' жила');
+      else if (cell.shard) found.push('осколок: ' + TIERS_NAME(cell.shard));
+      else if (cell.room) found.push('пещера комнаты');
+    }
+    cell.seen = true;
+  }
+  S.helpsLeft--; S.helpsUsed++;
+  const what = found.length ? found.join(', ') : 'только порода';
+  log('🤝 Друг открыл область 3×3: ' + what); say('🤝 Друг открыл 3×3: ' + what + '. Осталось помощей сегодня: ' + S.helpsLeft + '.');
+  if (S.helpsLeft < 1) setHelp(false);
+}
+function TIERS_NAME(t) { return TOOLS[t].name.toLowerCase(); }
+function setHelp(on) { helpMode = on && S.helpsLeft > 0 && !S.erupted; cv.classList.toggle('help', helpMode); $('bHelp').classList.toggle('on', helpMode); }
+
+// ---------- время ----------
+function passTime(hours) {
+  if (S.erupted || S.skipping) return;
+  closeSession();
+  S.skipping = true; S.acted = false; setHelp(false); say('');
+  const target = S.time + hours;
+  const tick = () => {
+    advanceClock(Math.min(target, S.time + (S.evacuated ? 2 : 0.25)));
+    if (S.erupted) { S.skipping = false; return; }
+    if (S.time < target - 1e-9) requestAnimationFrame(tick); else { S.skipping = false; log('Вернулся. ⚡ ' + Math.floor(S.energy)); }
+  };
+  requestAnimationFrame(tick);
+}
+function advanceClock(to) {
+  while (S.time < to - 1e-9 && !S.erupted) {
+    const nextInt = Math.floor(S.time + 1e-9) + 1, until = Math.min(to, nextInt), dh = until - S.time;
+    const gain = dh * regenPerHour() * (injured() ? cfg.injuryRegen : 1), room = cfg.eMax - S.energy;
+    if (gain > room) { if (!S.evacuated) S.wasted += gain - room; S.energy = cfg.eMax; } else S.energy += gain;
+    S.time = until;
+    const day = Math.floor(S.time / 24);
+    if (day !== S.helpDay) { S.helpDay = day; S.helpsLeft = cfg.friendHelps; }
+    for (const b of S.bots) if (!b.left && b.exit <= S.time) { b.left = true; log(b.name + ' эвакуировался с ' + Math.round(bValue(b, b.exit))); }
+    if (Math.abs(S.time - nextInt) < 1e-9) { S.time = nextInt; S.valueAt[nextInt] = S.value; roll(nextInt); }
+  }
+}
+function roll(hour) {
+  const p = hazardAt(hour);
+  if (Math.random() < p) { S.erupted = true; S.eruptHour = hour; log('💥 ВЗРЫВ! (шанс был ' + fmtPct(p) + ')'); setTimeout(endSeason, 400); }
+  else if (hour % 6 === 0) log('✓ Ролл — вулкан держится (' + fmtPct(p) + ')');
+}
+
+// ---------- деньги и итоги ----------
+function poolUsd() { return (BOTS + 1) * PICKAXE_USD * (1 - FEE) + (S ? S.carryIn : 0); }
+function capUsd() { return cfg.payCap > 0 ? cfg.payCap * PICKAXE_USD : Infinity; }
+function leaderboard() {
+  const E = S.eruptHour, rows = [{ name: 'Ты', me: true, out: S.evacuated ? S.evacHour : null, pts: S.evacuated ? S.value : (S.valueAt[E] !== undefined ? S.valueAt[E] : S.value) }];
+  for (const b of S.bots) rows.push({ name: b.name, out: b.exit < E ? b.exit : null, pts: Math.round(bValue(b, b.exit < E ? b.exit : E)) });
+  const total = rows.filter(r => r.out !== null).reduce((a, r) => a + r.pts, 0);
+  let paid = 0;
+  for (const r of rows) { r.pay = r.out !== null && total > 0 ? Math.min(capUsd(), poolUsd() * r.pts / total) : 0; paid += r.pay; }
+  rows.sort((a, b) => b.pay - a.pay || (b.out !== null) - (a.out !== null) || b.pts - a.pts);
+  return { rows, paid, leftover: Math.max(0, poolUsd() - paid) };
+}
+function endSeason() {
+  setHelp(false); closeSession();
+  const sl = S.sessLog, avgMs = sl.length ? sl.reduce((a, x) => a + x.ms, 0) / sl.length : 0, avgAct = sl.length ? Math.round(sl.reduce((a, x) => a + x.actions, 0) / sl.length) : 0;
+  const lb = leaderboard(); carryOver = lb.leftover;
+  const me = lb.rows.find(r => r.me);
+  const rec = { n: history.length + 1, erupt: S.eruptHour, out: S.evacuated ? S.evacHour : null, depth: S.maxDepth, pts: S.value, pay: Math.round(me.pay * 100) / 100,
+    rooms: S.roomsEntered, won: S.fights.won, lost: S.fights.lost, tools: Object.keys(S.tools).filter(k => S.tools[k]).map(k => TOOLS[k].icon).join(''), helps: S.helpsUsed };
+  history.push(rec); saveJSON('dungeon-history', history);
+  let board = '<div style="max-height:240px;overflow:auto"><table><tr><th>#</th><th>Игрок</th><th>Вышел</th><th>Поинты</th><th>Забрал</th></tr>';
+  lb.rows.forEach((r, i) => { board += '<tr' + (r.me ? ' style="color:var(--accent);font-weight:700"' : r.out === null ? ' class="muted"' : '') + '><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' + (r.out === null ? '💥' : fmtTime(r.out)) + '</td><td>' + r.pts + '</td><td>$' + r.pay.toFixed(2) + '</td></tr>'; });
+  board += '</table></div>';
+  $('modalBody').innerHTML = '<h3>Сезон ' + rec.n + ' окончен</h3>' +
+    '<div class="big">' + (S.evacuated ? '✅ Выжил: $' + me.pay.toFixed(2) + ' (ставка $' + PICKAXE_USD + ')' : '💥 Сгорел') + '</div>' +
+    '<p>Взрыв: <b>' + fmtTime(S.eruptHour) + '</b>. ' + (S.evacuated ? 'Ты вышел за <b>' + (S.eruptHour - S.evacHour).toFixed(1) + ' ч</b> до взрыва.' : 'Ты был на глубине ' + S.ant[1] + '.') + '</p>' +
+    '<p class="muted">Поинты ' + S.value + ' (из комнат ' + S.valueRooms + ') · глубина ' + S.maxDepth + ' · комнат ' + S.roomsEntered + ' · бои ' + S.fights.won + '/' + S.fights.lost + ' (засад ' + S.fights.ambush + ') · железа пробито ' + S.ironBroken +
+    ' · инструменты ' + (rec.tools || '—') + ' · помощь друзей ' + S.helpsUsed + ' · заходов ' + S.sessions + '</p>' +
+    '<p>⏱ Средний заход: <b>' + fmtClock(avgMs) + '</b>, действий в среднем ' + avgAct + ' (заходов с действиями: ' + sl.length + ')</p>' +
+    '<details open><summary>Лидерборд</summary>' + board + '</details>' + statsTable() +
+    '<div class="row" style="margin-top:10px"><button class="primary" id="bNext">Ещё сезон</button></div>';
+  $('modal').style.display = 'flex';
+  $('bNext').onclick = () => { $('modal').style.display = 'none'; newSeason(); };
+  renderStats();
+}
+function statsTable() {
+  if (!history.length) return '';
+  let h = '<table style="margin-top:8px"><tr><th>#</th><th>Взрыв</th><th>Выход</th><th>Глуб.</th><th>Поинты</th><th>$</th><th>Комн.</th><th>Бои</th><th>Инстр.</th></tr>';
+  for (const r of history.slice(-10)) h += '<tr><td>' + r.n + '</td><td>' + fmtTime(r.erupt) + '</td><td>' + (r.out !== null ? fmtTime(r.out) : '💥') + '</td><td>' + r.depth + '</td><td>' + r.pts + '</td><td>' + r.pay.toFixed(2) + '</td><td>' + r.rooms + '</td><td>' + r.won + '/' + r.lost + '</td><td>' + (r.tools || '—') + '</td></tr>';
+  return h + '</table>';
+}
+function renderStats() { $('stats').innerHTML = history.length ? statsTable() : 'Пока нет сыгранных сезонов.'; }
+
+// ---------- настройки ----------
+const TUNE = [
+  ['eMax', 'Максимум энергии', 100, 2000, 50], ['veinChance', 'Жилы в породе (доля, новый сезон)', 0.005, 0.1, 0.005], ['powerSlope', 'Рост силы монстров с глубиной (новый сезон)', 0.02, 0.15, 0.01], ['regenHours', 'Часов на полное восстановление', 2, 24, 1],
+  ['cDrill', 'Цена бурения железа', 5, 100, 5], ['cFight', 'Цена боя', 0, 40, 1],
+  ['injuryHours', 'Ранение: часов', 1, 24, 1], ['friendHelps', 'Помощь друзей: клеток в день', 0, 10, 1],
+  ['guardBonus', 'Сила сторожа, + к обычному монстру (новый сезон)', 0, 6, 1],
+  ['rooms', 'Комнат на поле (новый сезон)', 0, 30, 1], ['ironLines', 'Железных перегородок (новый сезон)', 0, 200, 5],
+  ['aggroChance', 'Агрессивных монстров (доля, новый сезон)', 0, 0.05, 0.002], ['cacheChance', 'Осколков в породе (доля, новый сезон)', 0, 0.05, 0.002],
+  ['hazMult', 'Множитель опасности', 0.25, 3, 0.25], ['botMult', 'Сила ботов', 0.25, 3, 0.25], ['payCap', 'Потолок выплаты × ставки (0 = выкл)', 0, 20, 1],
+];
+$('tuning').innerHTML = TUNE.map(([k, l, a, b, st]) => '<div style="margin-top:6px">' + l + ': <b id="v_' + k + '">' + cfg[k] + '</b><br><input type="range" id="t_' + k + '" min="' + a + '" max="' + b + '" step="' + st + '" value="' + cfg[k] + '"></div>').join('') +
+  '<div class="row" style="margin-top:8px"><button id="bResetPerm">Сбросить вечные инструменты</button></div>';
+TUNE.forEach(([k]) => $('t_' + k).oninput = () => { cfg[k] = +$('t_' + k).value; $('v_' + k).textContent = cfg[k]; if (k === 'eMax') S.energy = Math.min(S.energy, cfg.eMax); });
+$('bResetPerm').onclick = () => { perm = { drill: false }; saveJSON('dungeon-perm', perm); S.tools.drill = false; say('Вечные инструменты сброшены.'); };
+
+// ---------- отрисовка ----------
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rockColor(r, hard) { const t = r / H, k = hard ? 0.75 : 1; return 'rgb(' + (lerp(42, 70, t) * k | 0) + ',' + (lerp(47, 28, t) * k | 0) + ',' + (lerp(58, 20, t) * k | 0) + ')'; }
+let camC = START_C - 7, camR = 0;
+function draw() {
+  const tc = Math.max(0, Math.min(W - VIEW_COLS, S.ant[0] - 7)), tr = Math.max(0, Math.min(H - VIEW_ROWS, S.ant[1] - Math.floor(VIEW_ROWS * 0.4)));
+  camC += (tc - camC) * 0.18; camR += (tr - camR) * 0.18;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const c0 = Math.floor(camC), r0 = Math.floor(camR), ox = (camC - c0) * CELL, oy = (camR - r0) * CELL;
+  for (let vr = -1; vr <= VIEW_ROWS + 1; vr++) for (let vc = -1; vc <= VIEW_COLS + 1; vc++) {
+    const r = r0 + vr, c = c0 + vc; if (!inb(c, r)) continue;
+    const cell = S.grid[r][c], x = vc * CELL - ox, y = vr * CELL - oy;
+    if (r === 0) { ctx.fillStyle = '#4a5866'; ctx.fillRect(x, y, CELL, CELL); continue; }
+    if (!cell.seen) { ctx.fillStyle = '#0b0a09'; ctx.fillRect(x, y, CELL, CELL); continue; }
+    if (cell.iron) {
+      ctx.fillStyle = cell.roomWall ? '#3e4450' : '#5d6672'; ctx.fillRect(x, y, CELL, CELL);
+      ctx.fillStyle = cell.roomWall ? '#c9a24a' : '#8e97a3'; for (const [px, py] of [[5, 5], [CELL - 7, 5], [5, CELL - 7], [CELL - 7, CELL - 7]]) ctx.fillRect(x + px, y + py, 3, 3);
+      ctx.strokeStyle = '#2b3036'; ctx.strokeRect(x + .5, y + .5, CELL - 1, CELL - 1); continue;
+    }
+    if (cell.room && cell.dug) ctx.fillStyle = '#3a2c3e'; else if (cell.dug) ctx.fillStyle = '#6b5442'; else ctx.fillStyle = rockColor(r, cell.hard);
+    ctx.fillRect(x, y, CELL, CELL);
+    if (!cell.dug && cell.hard) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 6, y + 6, 4, 4); ctx.fillRect(x + 15, y + 14, 5, 5); }
+    if (!cell.monster && aggroNear(c, r)) { ctx.fillStyle = 'rgba(255,40,60,.28)'; ctx.fillRect(x, y, CELL, CELL); }
+    if (cell.vein && cell.vein.left > 0) {
+      const t = TIERS[cell.vein.tier], g = ctx.createRadialGradient(x + CELL / 2, y + CELL / 2, 2, x + CELL / 2, y + CELL / 2, CELL * 0.75);
+      g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - 6, y - 6, CELL + 12, CELL + 12);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('~' + (cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est), x + CELL / 2, y + CELL / 2 + 4);
+    }
+    if (cell.shard) {
+      ctx.fillStyle = TOOLS[cell.shard].color; ctx.beginPath();
+      ctx.moveTo(x + CELL / 2, y + 5); ctx.lineTo(x + CELL - 6, y + CELL / 2); ctx.lineTo(x + CELL / 2, y + CELL - 5); ctx.lineTo(x + 6, y + CELL / 2); ctx.closePath(); ctx.fill();
+    }
+    if (cell.monster) {
+      const guard = cell.monster.kind === 'guard';
+      ctx.fillStyle = guard ? '#c4122f' : '#7b2d9e'; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      ctx.strokeStyle = guard ? '#ffd166' : '#ff5c8a'; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); ctx.lineWidth = 1;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText((guard ? '👹' : '!') + cell.monster.power, x + CELL / 2, y + CELL / 2 + 4);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(x + .5, y + .5, CELL - 1, CELL - 1);
+  }
+  const haz = hazardAt(Math.floor(S.time) + 1), glow = Math.min(0.85, 0.15 + haz * 9);
+  const g2 = ctx.createLinearGradient(0, cv.height - 220, 0, cv.height);
+  g2.addColorStop(0, 'rgba(255,80,20,0)'); g2.addColorStop(1, 'rgba(255,80,20,' + glow * Math.min(1, (S.ant[1] + 10) / H) + ')');
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, cv.width, cv.height);
+  const ax = (S.ant[0] - camC) * CELL + CELL / 2, ay = (S.ant[1] - camR) * CELL + CELL / 2;
+  ctx.fillStyle = S.energy < 1 ? '#8a6a52' : '#ff8a3d';
+  ctx.beginPath(); ctx.ellipse(ax, ay + 2, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ax, ay - 6, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1.5;
+  for (const s of [-1, 1]) for (const k of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(ax + s * 5, ay + 2 + k / 2); ctx.lineTo(ax + s * 10, ay + 5 + k); ctx.stroke(); }
+  ctx.lineWidth = 1;
+  // мини-карта глубины справа
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(cv.width - 8, 4, 4, cv.height - 8);
+  ctx.fillStyle = '#ff8a3d'; ctx.fillRect(cv.width - 10, 4 + (cv.height - 8) * S.ant[1] / H - 2, 8, 4);
+  if (S.skipping) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Время идёт… ' + fmtTime(S.time), cv.width / 2, 30); }
+  if (S.erupted) { ctx.fillStyle = 'rgba(255,60,20,.55)'; ctx.fillRect(0, 0, cv.width, cv.height); }
+}
+
+function neighborInfo(d) {
+  const [dc, dr] = DIRS[d], nc = S.ant[0] + dc, nr = S.ant[1] + dr;
+  if (!inb(nc, nr) || nr < 1) return 'край';
+  const cell = S.grid[nr][nc];
+  if (cell.iron && cell.roomWall) return 'стена комнаты ✖';
+  if (cell.iron) return S.tools.drill ? 'железо · бур ' + cfg.cDrill + '⚡' : 'железо ✖';
+  if (cell.monster) return (cell.monster.kind === 'guard' ? '👹 ' : '! ') + cell.monster.power + ' · ' + Math.round(winChance(cell.monster) * 100) + '% · ' + cfg.cFight + '⚡';
+  let warn = !cell.monster && aggroNear(nc, nr) ? ' ⚠️' : '';
+  if (cell.vein && cell.vein.left > 0) { const n = cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est; return TIERS[cell.vein.tier].name.slice(0, 4) + ' ~' + n + ' · ' + (mineAll ? n * cfg.cMine + '⚡' : cfg.cMine + '⚡/шт') + warn; }
+  if (cell.dug) return 'проход · ' + stepCost() + '⚡' + warn;
+  return (cell.hard ? 'твёрдая · ' + cfg.cHard : 'мягкая · ' + cfg.cSoft) + '⚡' + warn;
+}
+
+function renderTools() {
+  let h = '';
+  for (const [k, t] of Object.entries(TOOLS)) {
+    const have = S.tools[k], n = Math.min(S.shards[k], t.need);
+    h += '<div class="tool"><span style="width:110px">' + t.icon + ' ' + t.name + (t.perm ? ' <small class="muted">вечн.</small>' : '') + '</span>' +
+      '<span class="bar"><div style="width:' + (have ? 100 : 100 * n / t.need) + '%;background:' + t.color + '"></div></span>' +
+      '<span style="width:60px;text-align:right">' + (have ? '✓' : n + '/' + t.need) + '</span></div>' +
+      '<div class="muted" style="font-size:11px;margin:-2px 0 4px 118px">' + t.desc + '</div>';
+  }
+  h += '<div style="margin-top:4px">Снаряга: +' + S.gear + ' · ' + (injured() ? '🩹 ранен до ' + fmtTime(S.injuryUntil) : 'не ранен') + '</div>';
+  if ($('tools').dataset.v !== h) { $('tools').innerHTML = h; $('tools').dataset.v = h; }
+}
+
+function updateUI() {
+  $('hDay').textContent = Math.floor(S.time / 24) + 1;
+  $('hHour').textContent = String(Math.floor(S.time % 24)).padStart(2, '0') + ':' + String(Math.floor((S.time % 1) * 60)).padStart(2, '0');
+  const haz = hazardAt(Math.floor(S.time) + 1);
+  $('hHaz').textContent = fmtPct(haz); $('hHaz').style.color = haz < 0.002 ? 'var(--ok)' : haz < 0.02 ? '#ffd166' : 'var(--danger)';
+  $('hEnergy').textContent = Math.floor(S.energy) + '/' + cfg.eMax + (injured() ? ' 🩹' : ''); $('hEbar').style.width = (100 * S.energy / cfg.eMax) + '%';
+  const left = S.bots.filter(b => b.left).length;
+  $('hCrowd').textContent = (BOTS - left) + (S.evacuated ? 0 : 1); $('hLeft').textContent = left + (S.evacuated ? 1 : 0);
+  $('hPool').textContent = '$' + poolUsd().toFixed(0) + (S.carryIn ? ' (+' + S.carryIn.toFixed(0) + ')' : '');
+  $('sCarry').textContent = S.carry + ' 💎'; $('sValue').textContent = 'поинты ' + S.value;
+  $('sDepth').textContent = S.ant[1]; $('sPower').textContent = antPower();
+  const asc = ascentCost();
+  $('sAscent').textContent = S.evacuated ? 'наверху' : asc + '⚡'; $('sAscent').style.color = !S.evacuated && S.energy < asc ? 'var(--danger)' : '';
+  $('sSess').textContent = S.sessStart === null ? '⏱ Заход начнётся с первого действия' : '⏱ Этот заход: ' + fmtClock(performance.now() - S.sessStart) + ' · действий ' + S.sessActions;
+  $('sNote').textContent = S.evacuated ? 'Эвакуирован в ' + fmtTime(S.evacHour) + '. Ждём взрыва.' :
+    'Полная энергия через ' + ((cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1)).toFixed(1) + ' ч.' + (S.energy < asc ? ' ⚠️ На эвакуацию энергии НЕ хватает.' : '');
+  for (const [d, id, mid] of [['up', 'nUp', 'mUp'], ['down', 'nDown', 'mDown'], ['left', 'nLeft', 'mLeft'], ['right', 'nRight', 'mRight']]) { const v = neighborInfo(d); if ($(id).textContent !== v) { $(id).textContent = v; $(mid).textContent = v; } }
+  const off = !canAct();
+  document.querySelectorAll('[data-dir]').forEach(b => b.disabled = off);
+  $('bEvac').disabled = off; $('bClimb').disabled = off;
+  $('mEvacC').textContent = S.evacuated ? 'наверху' : asc + '⚡'; $('mEvac').disabled = off; $('mClimb').disabled = off;
+  $('mHelpN').textContent = 'друзья ' + S.helpsLeft; $('mHelp').disabled = S.erupted || S.skipping || S.helpsLeft < 1; $('mHelp').classList.toggle('on', helpMode); $('bEvac').textContent = '⇧ ЭВАКУАЦИЯ (' + asc + '⚡)';
+  $('bHelp').disabled = S.erupted || S.skipping || S.helpsLeft < 1;
+  $('helpNote').textContent = 'сегодня осталось ' + S.helpsLeft + ' из ' + cfg.friendHelps + (helpMode ? ' — тапни по скрытой клетке' : '');
+  document.querySelectorAll('[data-skip]').forEach(b => b.disabled = S.skipping || S.erupted);
+  $('bFull').disabled = S.skipping || S.erupted || S.energy >= cfg.eMax - 0.5;
+  let surv = 1; for (let h = Math.floor(S.time) + 1; h <= Math.floor(S.time) + 8; h++) surv *= 1 - hazardAt(h);
+  $('skipNote').textContent = S.evacuated ? 'Ты наверху — промотай время до взрыва.' : 'Сон 8 ч: шанс взрыва ' + ((1 - surv) * 100).toFixed(1) + '%. ' + (S.energy >= asc ? 'На подъём хватает.' : 'На подъём НЕ хватает.');
+  const html = S.feed.slice(0, 40).map(l => '<div>' + l + '</div>').join('');
+  if ($('feed').dataset.v !== html) { $('feed').innerHTML = html; $('feed').dataset.v = html; }
+  renderTools();
+}
+
+// ---------- ввод ----------
+document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => doStep(b.dataset.dir));
+document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => passTime(S.evacuated ? 24 : +b.dataset.skip));
+$('bFull').onclick = () => passTime(Math.max(0.25, (cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1)));
+$('bEvac').onclick = evacuate; $('bClimb').onclick = climbPartial;
+function toggleMine() { mineAll = !mineAll; $('bMineMode').innerHTML = mineAll ? '⛏ всё<small>вся жила</small>' : '⛏ ×1<small>по одному</small>'; $('mMine').innerHTML = mineAll ? '⛏<small>вся жила</small>' : '⛏<small>×1</small>'; }
+$('bMineMode').onclick = toggleMine;
+$('bHelp').onclick = () => setHelp(!helpMode);
+// карта: тап по клетке — шаг в её сторону (или помощь друга), свайп — шаг в сторону свайпа
+function cellAtPoint(x, y) {
+  const rect = cv.getBoundingClientRect(), sx = cv.width / rect.width, sy = cv.height / rect.height;
+  return [Math.floor(((x - rect.left) * sx) / CELL + camC), Math.floor(((y - rect.top) * sy) / CELL + camR)];
+}
+let pDown = null;
+cv.addEventListener('pointerdown', e => { pDown = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener('pointerup', e => {
+  if (!pDown) return;
+  const dx = e.clientX - pDown.x, dy = e.clientY - pDown.y; pDown = null;
+  if (Math.hypot(dx, dy) > 24) { if (!helpMode) doStep(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); return; }
+  const [c, r] = cellAtPoint(e.clientX, e.clientY);
+  if (helpMode) { if (inb(c, r) && r > 0) helpAt(c, r); return; }
+  const ddx = c - S.ant[0], ddy = r - S.ant[1];
+  if (!ddx && !ddy) return;
+  doStep(Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up'));
+});
+cv.addEventListener('pointercancel', () => { pDown = null; });
+// пульт внизу (телефон)
+$('mHelp').onclick = () => setHelp(!helpMode);
+$('mMine').onclick = toggleMine;
+$('mEvac').onclick = evacuate; $('mClimb').onclick = climbPartial;
+$('mSleep').onclick = () => $('mSkips').classList.toggle('open');
+$('mFull').onclick = () => { $('mSkips').classList.remove('open'); $('bFull').onclick(); };
+document.querySelectorAll('#mSkips [data-skip]').forEach(b => b.addEventListener('click', () => $('mSkips').classList.remove('open')));
+$('mInfo').onclick = () => { const d = document.querySelector('details.card'); d.open = true; d.scrollIntoView({ behavior: 'smooth' }); };
+// высота карты под экран телефона
+function fitCanvas() {
+  const mobile = window.matchMedia('(max-width: 760px)').matches;
+  let rows = 24;
+  if (mobile) {
+    const bar = $('mbar').getBoundingClientRect().height || 170, head = document.querySelector('header').getBoundingClientRect().height || 50;
+    document.body.style.setProperty('--mbar-h', bar + 'px');
+    const cssW = Math.min(window.innerWidth - 16, 760), avail = window.innerHeight - bar - head - 20;
+    rows = Math.max(10, Math.min(24, Math.floor(avail * (cv.width / cssW) / CELL)));
+  }
+  if (rows !== VIEW_ROWS || cv.height !== rows * CELL) { VIEW_ROWS = rows; cv.height = rows * CELL; }
+}
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('keydown', e => {
+  const m = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'up' };
+  if (m[e.key]) { doStep(m[e.key]); e.preventDefault(); }
+  if ('mMьЬ'.includes(e.key)) toggleMine();
+});
+
+function frame() { draw(); updateUI(); requestAnimationFrame(frame); }
+newSeason(); renderStats(); fitCanvas(); setTimeout(fitCanvas, 300); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
