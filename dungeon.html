@@ -181,7 +181,7 @@
 // Question: делают ли пещеры, стены, сторожа, опасные зоны, осколки и помощь друзей заход глубже, не превращаясь в рутину?
 // Date: 2026-10-07
 
-const W = 40, H = 200, CELL = 26, VIEW_COLS = 15, START_C = 20;
+const W = 40, H = 80, CELL = 26, VIEW_COLS = 15, START_C = 20;
 let VIEW_ROWS = 24;
 const TIERS = [
   { name: 'зелёная', color: '#3ddc84', value: 1 },
@@ -199,9 +199,9 @@ const DIRS = { left: [-1, 0], right: [1, 0], down: [0, 1], up: [0, -1] };
 const HAZ_BY_DAY = [0.0005, 0.0005, 0.0007, 0.004, 0.008, 0.015, 0.025, 0.04, 0.06, 0.1];
 
 const cfg = {
-  eMax: 1000, regenHours: 16, cSoft: 6, // энергия ×5: полная шкала ≈ 150–200 действий ≈ 10 мин захода (решение Павла 07.10)
+  eMax: 200, regenHours: 16, cSoft: 6, // короткий заход для тестов (Павел 16.10; 10-минутная версия — eMax 1000 и H 200)
   cHard: 15, cMine: 5, cTunnel: 2, cFight: 10, cDrill: 40,
-  injuryHours: 12, injuryRegen: 0.25, rooms: 35, ironLines: 180, aggroChance: 0.012, cacheChance: 0.012, veinChance: 0.03, powerSlope: 0.05,
+  injuryHours: 12, injuryRegen: 0.25, rooms: 14, ironLines: 70, aggroChance: 0.012, cacheChance: 0.012, veinChance: 0.03, powerSlope: 0.12,
   friendHelps: 3, guardBonus: 3, hazMult: 1, botMult: 1, payCap: 10,
 };
 
