@@ -1,12 +1,12 @@
 <!-- PROTOTYPE - NOT FOR PRODUCTION -->
 <!-- Question: делают ли пещеры (железные стены, сторож на входе, опасные зоны, осколки → инструменты, помощь друзей) заход глубже и интереснее, не превращаясь в лабиринт-рутину? -->
-<!-- Date: 2026-10-07 -->
+<!-- Date: 2026-10-07 · v5.5 (2026-10-18): управление тапом по клетке, шторка, эвакуация удержанием -->
 <!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Вулкан — подземелье v5</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Вулкан — подземелье v5.5</title>
 <style>
   :root { --bg:#14110f; --panel:#1e1a17; --line:#3a322c; --text:#f1e7dc; --muted:#a8998b; --accent:#ff8a3d; --danger:#ff4d4d; --ok:#3ddc84; --energy:#ffd166; }
   * { box-sizing: border-box; }
@@ -14,13 +14,11 @@
   header { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
   header b { color: var(--accent); }
   .wrap { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 16px; align-items: flex-start; }
-  canvas { background: #000; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; touch-action: manipulation; }
-  canvas.help { cursor: crosshair; border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok); }
   .side { flex: 1 1 320px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
   .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  button { background: #2c2520; color: var(--text); border: 1px solid #4a3f37; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; min-height: 40px; }
+  button { background: #2c2520; color: var(--text); border: 1px solid #4a3f37; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); color: #1a0f08; border-color: var(--accent); font-weight: 700; }
   button.danger { background: #5a1a1a; border-color: var(--danger); }
@@ -29,57 +27,118 @@
   .big { font-size: 20px; font-weight: 700; }
   .muted { color: var(--muted); }
   .feed { max-height: 160px; overflow: auto; font-size: 12px; color: var(--muted); }
-  .pad { display: grid; grid-template-columns: repeat(3, 96px); gap: 6px; margin-top: 8px; }
-  .pad button { min-height: 60px; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; }
-  .pad small { font-size: 10px; color: var(--muted); line-height: 1.1; margin-top: 2px; }
-  .ebar { height: 12px; background: #2c2520; border-radius: 6px; overflow: hidden; min-width: 120px; flex: 1; }
-  .ebar div { height: 100%; background: var(--energy); }
-  .msg { min-height: 20px; color: var(--energy); font-size: 13px; }
   .tool { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
   .tool .bar { flex: 1; height: 8px; background: #2c2520; border-radius: 4px; overflow: hidden; }
   .tool .bar div { height: 100%; }
   table { border-collapse: collapse; width: 100%; font-size: 12px; }
   td, th { border-bottom: 1px solid var(--line); padding: 2px 4px; text-align: right; }
   th:first-child, td:first-child { text-align: left; }
-  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 30; padding: 16px; }
   #modal .card { max-width: 600px; width: 100%; max-height: 90vh; overflow: auto; }
   details summary { cursor: pointer; color: var(--muted); }
   input[type=range] { width: 100%; }
-  #mbar { display: none; }
-  @media (max-width: 760px) {
-    body { font-size: 13px; padding-bottom: calc(var(--mbar-h, 170px) + env(safe-area-inset-bottom)); }
-    header { gap: 2px 10px; padding: 6px 10px; font-size: 12px; }
-    header .ebar { min-width: 80px; }
-    .hide-m { display: none !important; }
-    .wrap { padding: 6px 8px; gap: 10px; }
-    canvas { width: 100%; height: auto; touch-action: none; }
-    .side { max-width: none; }
-    #mbar { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: rgba(20,17,15,.97); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
-    #mbar .mmsg { min-height: 18px; font-size: 12px; color: var(--energy); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #mbar .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-    #mbar button { min-height: 56px; padding: 2px; font-size: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-    #mbar button small { font-size: 9.5px; color: var(--muted); line-height: 1.1; margin-top: 1px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #mbar button:active { transform: scale(.95); }
-    #mbar .skips { display: none; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
-    #mbar .skips.open { display: grid; }
-    #mbar .skips button { min-height: 44px; font-size: 14px; }
-  }
   .tier0 { color: #3ddc84 } .tier1 { color: #4aa3ff } .tier2 { color: #b26bff } .tier3 { color: #ff4d4d }
+
+  /* ---- игровое окно: карта + шторка + панель ---- */
+  #game { position: relative; width: 390px; height: 760px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #000;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #view { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  #view.help::after, #view.inspect::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 3px var(--ok); pointer-events: none; z-index: 2; }
+  #view.inspect::after { box-shadow: inset 0 0 0 3px #4aa3ff; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #toast { position: absolute; top: 8px; left: 8px; right: 60px; background: rgba(10,8,7,.82); color: var(--energy); padding: 7px 10px; border-radius: 8px; font-size: 13px; line-height: 1.3;
+    opacity: 0; transform: translateY(-6px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 3; }
+  #toast.show { opacity: 1; transform: none; }
+  .fabs { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+  .fabs button { width: 44px; height: 44px; padding: 0; border-radius: 50%; background: rgba(30,26,23,.88); font-size: 20px; }
+  #bCenter { display: none; color: var(--accent); }
+  #bCenter.show { display: block; }
+  #sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--panel); border-top: 1px solid #5a4a3e; border-radius: 14px 14px 0 0;
+    padding: 12px 14px 10px; max-height: 48%; overflow: auto; transform: translateY(105%); transition: transform .18s ease-out; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
+  #sheet.open { transform: none; }
+  #sheet .x { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; padding: 0; background: none; border: 0; color: var(--muted); font-size: 18px; }
+  #sheet h4 { margin: 0 44px 6px 0; font-size: 16px; }
+  #sheet h4.warn { color: var(--energy); }
+  #sheet .acts { display: flex; gap: 8px; margin-top: 10px; }
+  #sheet .acts button { flex: 1; min-height: 52px; font-size: 16px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 6px; }
+  #sheet .acts button small { font-size: 12px; font-weight: 400; opacity: .85; }
+  #sheet .acts button.safe { flex: 1.5; background: #3a322c; border-color: #8a7a6c; }
+  #sheet .acts button.risk { background: #5a1a1a; border-color: var(--danger); }
+  #sheet .acts button.arming { opacity: .45; }
+  #sheet .acts.four button { min-height: 48px; font-size: 15px; }
+  #sheet .chance { font-size: 34px; font-weight: 800; line-height: 1.1; margin: 2px 0 4px; }
+  #sheet .chance small { font-size: 14px; font-weight: 400; color: var(--muted); }
+  #sheet .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #sheet .wline { color: var(--energy); }
+  #bar { display: flex; gap: 4px; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: rgba(20,17,15,.98); border-top: 1px solid var(--line); flex: 0 0 auto; z-index: 5; }
+  .slot { flex: 0 0 44px; min-height: 54px; padding: 2px; font-size: 21px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .slot small { font-size: 10px; color: var(--muted); line-height: 1.1; white-space: nowrap; }
+  .slot:active { transform: scale(.96); }
+  .slot.en { flex-basis: 56px; font-size: 14px; }
+  .slot.en b { color: var(--energy); }
+  .slot.en .ebg { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--energy); }
+  .slot.en.low small { color: var(--danger); }
+  .slot.evac { flex: 1 1 auto; flex-direction: row; gap: 6px; padding: 2px 4px; background: #3e1a10; border-color: var(--accent); font-size: 13px; }
+  .slot.evac.holding { background: #5c2814; }
+  .slot.evac .evt { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  .slot.evac .evt b { white-space: normal; line-height: 1.1; text-align: left; }
+  .slot.evac .evt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .slot.evac .evt small.w { color: var(--energy); }
+  .ring { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--accent) calc(var(--p, 0) * 1turn), rgba(255,255,255,.14) 0); }
+  .ring span { width: 22px; height: 22px; border-radius: 50%; background: #3e1a10; display: grid; place-items: center; font-size: 15px; }
+  .slot.on { background: #1d3b2a; border-color: var(--ok); }
+  button.slot.inspect.on { background: #16304a; border-color: #4aa3ff; }
+  .ctl li { margin: 2px 0; }
+  .ctl { margin: 0; padding-left: 18px; font-size: 13px; }
+  @media (min-width: 761px) { .show-m { display: none !important; } }
+  @media (max-width: 760px) {
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+    body { font-size: 13px; }
+    header { flex-wrap: nowrap; gap: 10px; padding: 6px 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
+    .hide-m { display: none !important; }
+    .wrap { display: block; padding: 0; }
+    #game { position: fixed; left: 0; right: 0; top: var(--head-h, 34px); bottom: 0; width: auto; height: auto !important; border: 0; border-radius: 0; }
+    .side { display: none; }
+    .side.open { display: flex; position: fixed; inset: 0; z-index: 20; overflow: auto; background: var(--bg); padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); max-width: none; }
+    .menuhead { position: sticky; top: 0; z-index: 1; }
+  }
 </style>
 </head>
 <body>
 <header>
   <span>День <b id="hDay">1</b>, <b id="hHour">00:00</b></span>
-  <span>Опасность: <b id="hHaz">0%</b>/ч</span>
-  <span class="row" style="flex:0 1 240px">⚡ <span class="ebar"><div id="hEbar"></div></span> <b id="hEnergy">200</b></span>
+  <span>🌋 <b id="hHaz">0%</b>/ч</span>
+  <span>💎 <b id="hCarry">0</b> <span class="muted" id="hPts"></span></span>
+  <span>↓<b id="hDepth">0</b></span>
   <span class="hide-m">На вулкане: <b id="hCrowd">41</b> · ушли: <b id="hLeft">0</b></span>
-  <span>Пул: <b id="hPool"></b></span>
+  <span>Пул <b id="hPool"></b></span>
 </header>
 
 <div class="wrap">
-  <canvas id="cv" width="390" height="624"></canvas>
+  <div id="game">
+    <div id="view">
+      <canvas id="cv"></canvas>
+      <div id="toast"></div>
+      <div class="fabs">
+        <button id="bZoom" title="Приблизить / отдалить">⤢</button>
+        <button id="bCenter" title="К муравью">◎</button>
+      </div>
+      <div id="sheet"><button class="x" id="sheetX" title="Закрыть">✕</button><div id="sheetBody"></div></div>
+    </div>
+    <div id="bar">
+      <button id="bEnergy" class="slot en" title="Энергия"><span class="ebg" id="eFill"></span><b id="bEn">⚡200</b><small id="bEnAsc">подъём 0</small></button>
+      <button id="bEvac" class="slot evac" title="Удерживай, чтобы подняться"><span class="ring" id="ring"><span>⬆</span></span><span class="evt"><b id="bEvacT">Наверх</b><small id="bEvacS"></small></span></button>
+      <button id="bHelp" class="slot" title="Помощь друга">🤝<small id="bHelpN">3</small></button>
+      <button id="bInspect" class="slot inspect" title="Что в клетке">?</button>
+      <button id="bSleep" class="slot" title="Сон">☾</button>
+      <button id="bMenu" class="slot show-m" title="Меню">≡</button>
+    </div>
+  </div>
 
-  <div class="side">
+  <div class="side" id="side">
+    <div class="card show-m menuhead"><div class="row"><b>Меню</b><button id="menuX" style="margin-left:auto">✕ Закрыть</button></div></div>
+
     <div class="card">
       <h3>Муравей</h3>
       <div class="row"><span class="big" id="sCarry">0 💎</span><span class="muted" id="sValue">поинты 0</span></div>
@@ -89,40 +148,23 @@
     </div>
 
     <div class="card">
+      <h3>Как управлять</h3>
+      <ul class="ctl">
+        <li><b>Тап по соседней клетке</b> — шаг или копание, сразу.</li>
+        <li><b>Монстр и засада</b> — откроется шторка; тапни клетку ещё раз или нажми «Бой» / «Всё равно идти».</li>
+        <li><b>Жила</b> — шторка: «Добыть 1» или «Всю жилу».</li>
+        <li><b>Долгое нажатие</b> или <b>?</b> — что в клетке.</li>
+        <li><b>Свайп</b> — двигать камеру, <b>щипок</b> или <b>⤢</b> — зум, <b>◎</b> — к муравью.</li>
+        <li><b>⬆ Наверх</b> — удерживай, пока не заполнится кольцо: муравей сам пойдёт по туннелям в обход опасных зон.</li>
+        <li><b>🤝</b> — выбери скрытую клетку, тапни её ещё раз: друг откроет 3×3.</li>
+        <li>Клавиатура: стрелки — шаг, Enter — подтвердить, Esc — отмена.</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h3>Осколки и инструменты</h3>
       <div id="tools"></div>
       <div class="muted" style="font-size:12px;margin-top:4px">Осколки не передаются. Сезонные инструменты сгорают с сезоном, вечные остаются.</div>
-    </div>
-
-    <div class="card" id="actCard">
-      <h3>Заход — действия мгновенные</h3>
-      <div class="msg" id="msg"></div>
-      <div class="pad hide-m">
-        <span></span><button data-dir="up">↑<small id="nUp"></small></button><span></span>
-        <button data-dir="left">←<small id="nLeft"></small></button>
-        <button id="bMineMode" title="Сколько добывать за шаг в жилу">⛏ ×1<small>по одному</small></button>
-        <button data-dir="right">→<small id="nRight"></small></button>
-        <span></span><button data-dir="down">↓<small id="nDown"></small></button><span></span>
-      </div>
-      <div class="row hide-m" style="margin-top:8px">
-        <button id="bEvac" class="danger">⇧ ЭВАКУАЦИЯ</button>
-        <button id="bClimb">Подняться, на сколько хватит</button>
-      </div>
-      <div class="row hide-m" style="margin-top:8px">
-        <button id="bHelp">🤝 Помощь друзей</button>
-        <span class="muted" id="helpNote"></span>
-      </div>
-    </div>
-
-    <div class="card hide-m">
-      <h3>Уйти из игры (время пойдёт)</h3>
-      <div class="row">
-        <button data-skip="1">1 ч</button>
-        <button data-skip="3">3 ч</button>
-        <button data-skip="8" class="primary">😴 Сон 8 ч</button>
-        <button id="bFull">До полной энергии</button>
-      </div>
-      <div class="muted" id="skipNote" style="margin-top:6px"></div>
     </div>
 
     <div class="card">
@@ -130,7 +172,7 @@
       <div class="feed" id="feed"></div>
     </div>
 
-    <details class="card">
+    <details class="card" id="legend">
       <summary>Как читать карту</summary>
       <div class="muted" style="margin-top:6px;font-size:13px">
         ⬛ Серая клепаная клетка — <b>железо</b>, не пройти (пробивает только <b>бур</b>).<br>
@@ -138,7 +180,8 @@
         🟪 Фиолетовый монстр с «!» — <b>агрессивный</b>; красноватые клетки вокруг — его <b>опасная зона</b>: шагнёшь туда — он нападёт.<br>
         ◆ Цветные ромбики — <b>осколки</b>: жёлтый — фонарь, коричневый — верёвка, голубой — бур.<br>
         Светящиеся круги — жилы (цвет = ценность, «~N» = примерный размер).<br>
-        🤝 Помощь друзей: нажми кнопку и тапни по скрытой клетке — друг откроет область 3×3 вокруг неё.<br>
+        Метки у соседних клеток — цена шага; «⚠» — после него на подъём не хватит энергии.<br>
+        🤝 Помощь друзей: нажми 🤝 и тапни по скрытой клетке — друг откроет область 3×3 вокруг неё.<br>
         Тёмная клепаная стена с золотыми заклёпками — <b>стена комнаты</b>: бур её не берёт, вход только через сторожа.
       </div>
     </details>
@@ -155,34 +198,14 @@
   </div>
 </div>
 
-<div id="mbar">
-  <div class="mmsg" id="mMsg">Тапни клетку рядом с муравьём или свайпни — шаг туда.</div>
-  <div class="grid">
-    <button id="mHelp">🤝<small id="mHelpN">друзья</small></button>
-    <button id="mMine">⛏<small>×1</small></button>
-    <button data-dir="up">↑<small id="mUp"></small></button>
-    <button id="mClimb">⤒<small>частично</small></button>
-    <button id="mEvac" class="danger">⇧<small id="mEvacC">выход</small></button>
-    <button id="mSleep">😴<small>уйти</small></button>
-    <button data-dir="left">←<small id="mLeft"></small></button>
-    <button data-dir="down">↓<small id="mDown"></small></button>
-    <button data-dir="right">→<small id="mRight"></small></button>
-    <button id="mInfo">ⓘ<small>справка</small></button>
-  </div>
-  <div class="skips" id="mSkips">
-    <button data-skip="1">1 ч</button><button data-skip="3">3 ч</button><button data-skip="8" class="primary">Сон 8 ч</button><button id="mFull">до полной</button>
-  </div>
-</div>
-
 <div id="modal"><div class="card" id="modalBody"></div></div>
 
 <script>
 // PROTOTYPE - NOT FOR PRODUCTION
 // Question: делают ли пещеры, стены, сторожа, опасные зоны, осколки и помощь друзей заход глубже, не превращаясь в рутину?
-// Date: 2026-10-07
+// Date: 2026-10-07 · v5.5 (2026-10-18): новое управление
 
-const W = 40, H = 80, CELL = 26, VIEW_COLS = 15, START_C = 20;
-let VIEW_ROWS = 24;
+const W = 40, H = 80, START_C = 20;
 const TIERS = [
   { name: 'зелёная', color: '#3ddc84', value: 1 },
   { name: 'синяя', color: '#4aa3ff', value: 2 },
@@ -205,7 +228,15 @@ const cfg = {
   friendHelps: 3, guardBonus: 3, hazMult: 1, botMult: 1, payCap: 10,
 };
 
-let S, mineAll = false, helpMode = false;
+// управление (v5.5)
+const CONFIRM_MS = 250, GUARD_MS = 300, HOLD_MS = 600, LONG_MS = 400, MOVE_PX = 10;
+const NEAR = 9, FAR = 17, ZMIN = 6, ZMAX = 24;
+
+let S, helpMode = false, inspectMode = false;
+let sel = null, sheetKind = null, sheetOpenedAt = 0, lastGuardAct = 0;
+let zoomCols = NEAR, zoomTarget = NEAR, camX = START_C - 4, camY = -2, follow = true, antX = START_C, antY = 0;
+let dpr = 1, vw = 390, vh = 600, hold = null, hoverCell = null, flash = null, floats = [], toastT = 0, lastPtrType = 'mouse';
+const ascCache = new Map();
 let history = loadJSON('dungeon-history', []);
 let perm = loadJSON('dungeon-perm', { drill: false }); // вечные инструменты
 let carryOver = 0;
@@ -306,6 +337,7 @@ function newSeason() {
   };
   reveal(START_C, 0);
   log('Сезон начался.' + (perm.drill ? ' У тебя вечный бур 🛠.' : ''));
+  resetView();
 }
 
 function bValue(b, t) { return cfg.botMult * b.rate * 2.5 * t * (1 + t / 400); }
@@ -316,7 +348,11 @@ function winChance(m) { return Math.max(0.05, Math.min(0.95, 0.5 + (antPower() -
 function injured() { return S.time < S.injuryUntil; }
 function reveal(c, r) { const k = sightRadius(); for (let dr = -k; dr <= k; dr++) for (let dc = -k; dc <= k; dc++) if (inb(c + dc, r + dr)) S.grid[r + dr][c + dc].seen = true; }
 function log(m) { S.feed.unshift(fmtTime(S.time) + ' — ' + m); if (S.feed.length > 120) S.feed.pop(); }
-function say(t) { $('msg').textContent = t; const m = $('mMsg'); if (m && t) m.textContent = t; }
+function say(t) {
+  if (!t) return;
+  const el = $('toast'); el.textContent = t; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), Math.min(7000, 2200 + t.length * 45));
+}
 
 // опасная зона: клетки вокруг живого агрессивного монстра (8 соседей)
 function aggroNear(c, r) {
@@ -329,22 +365,32 @@ function aggroNear(c, r) {
   return null;
 }
 
-function ascentPath() {
-  const key = (c, r) => r * W + c, prev = new Map(), q = [S.ant.slice()];
-  prev.set(key(...S.ant), null);
-  while (q.length) {
-    const [c, r] = q.shift();
-    if (r === 0) { const p = []; let k = key(c, r); while (k !== null) { p.unshift([k % W, Math.floor(k / W)]); k = prev.get(k); } return p; }
+// путь наверх: только по открытым туннелям и никогда через опасную зону (v5.5).
+// from — откуда (по умолчанию муравей), extra — индекс клетки, которую считать уже вскопанной (для бейджа цены).
+function ascentPath(from, extra) {
+  from = from || S.ant;
+  const k0 = from[1] * W + from[0], ck = k0 + '|' + (extra === undefined ? -1 : extra);
+  if (ascCache.has(ck)) return ascCache.get(ck);
+  const prev = new Map([[k0, -1]]), q = [k0];
+  let res = null;
+  for (let i = 0; i < q.length; i++) {
+    const k = q[i], c = k % W, r = (k - c) / W;
+    if (r === 0) { res = []; for (let j = k; j !== -1; j = prev.get(j)) res.unshift([j % W, Math.floor(j / W)]); break; }
     for (const [dc, dr] of Object.values(DIRS)) {
-      const nc = c + dc, nr = r + dr;
-      if (!inb(nc, nr) || !S.grid[nr][nc].dug || prev.has(key(nc, nr))) continue;
-      prev.set(key(nc, nr), key(c, r)); q.push([nc, nr]);
+      const nc = c + dc, nr = r + dr, nk = nr * W + nc;
+      if (!inb(nc, nr) || prev.has(nk)) continue;
+      const cell = S.grid[nr][nc];
+      if (!(cell.dug || nk === extra) || cell.monster || aggroNear(nc, nr)) continue;
+      prev.set(nk, k); q.push(nk);
     }
   }
-  return [S.ant.slice()];
+  ascCache.set(ck, res);
+  return res;
 }
-function ascentCost() { return Math.max(0, ascentPath().length - 1) * stepCost(); }
-function canAct() { return !S.evacuated && !S.erupted && !S.skipping; }
+function ascentCost(from, extra) { const p = ascentPath(from, extra); return p ? (p.length - 1) * stepCost() : Infinity; }
+function fmtAsc(a) { return a === Infinity ? 'нет пути' : a + '⚡'; }
+function dirty() { ascCache.clear(); }
+function canAct() { return !S.evacuated && !S.erupted && !S.skipping && !S.moving; }
 function act() { S.actions++; S.sessActions++; if (!S.acted) { S.acted = true; S.sessions++; S.sessStart = performance.now(); S.sessEnergyStart = S.energy; } }
 function fmtClock(ms) { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function closeSession() {
@@ -385,40 +431,66 @@ function fight(m, where) {
   return { win: false, text: 'Поражение (шанс ' + Math.round(ch * 100) + '%). Ранен до ' + fmtTime(S.injuryUntil) + ': восстановление ×' + cfg.injuryRegen + '.' };
 }
 
-// ---------- действия ----------
-function doStep(d) {
+// ---------- действия (логика как в v5.4, разнесена по типам) ----------
+// что будет, если пойти в соседнюю клетку
+function classify(c, r) {
+  if (!inb(c, r)) return { kind: 'blocked', why: 'Туда нельзя — край поля.' };
+  if (r < 1) return { kind: 'blocked', why: 'Наверх — только кнопкой «⬆ Наверх».' };
+  const cell = S.grid[r][c];
+  if (cell.iron && cell.roomWall) return { kind: 'blocked', why: 'Стену комнаты буром не взять — вход только через сторожа.' };
+  if (cell.iron && !S.tools.drill) return { kind: 'blocked', why: 'Железо — не пройти. Нужен бур (6 осколков).' };
+  if (cell.monster) return { kind: 'monster', m: cell.monster };
+  if (cell.vein && cell.vein.left > 0) return { kind: 'vein', v: cell.vein };
+  const cost = cell.iron ? cfg.cDrill : cell.dug ? stepCost() : (cell.hard ? cfg.cHard : cfg.cSoft);
+  return { kind: 'move', cost, drill: cell.iron, ambush: aggroNear(c, r) };
+}
+
+function doMove(nc, nr) {
   if (!canAct()) return;
-  const [dc, dr] = DIRS[d], nc = S.ant[0] + dc, nr = S.ant[1] + dr;
-  if (!inb(nc, nr) || nr < 1) { say('Туда нельзя.'); return; }
-  const cell = S.grid[nr][nc];
+  const cell = S.grid[nr][nc], before = S.energy;
   if (cell.iron && cell.roomWall) { say('Стену комнаты буром не взять — вход только через сторожа.'); return; }
   if (cell.iron) {
     if (!S.tools.drill) { say('Железо — не пройти. Нужен бур (6 осколков).'); return; }
     if (S.energy < cfg.cDrill) { say('Бурить железо: ' + cfg.cDrill + '⚡, есть ' + Math.floor(S.energy) + '.'); return; }
     S.energy -= cfg.cDrill; cell.iron = false; cell.dug = true; S.ironBroken++; act();
-    moveInto(nc, nr); say('🛠 Пробил железо (' + cfg.cDrill + '⚡).'); return;
-  }
-  if (cell.monster) {
-    if (S.energy < cfg.cFight) { say('На бой нужно ' + cfg.cFight + '⚡.'); return; }
-    S.energy -= cfg.cFight; act();
-    const m = cell.monster, res = fight(m, [nc, nr]);
-    if (res.win) { cell.monster = null; cell.dug = true; moveInto(nc, nr, true); }
-    say(res.text); return;
-  }
-  if (cell.vein && cell.vein.left > 0) {
-    const v = cell.vein, can = Math.floor(S.energy / cfg.cMine);
-    if (can < 1) { say('Нет энергии на добычу (' + cfg.cMine + '⚡ за кристалл).'); return; }
-    const n = mineAll ? Math.min(can, v.left) : 1;
-    S.energy -= n * cfg.cMine; v.left -= n; S.carry += n; S.value += n * TIERS[v.tier].value; act();
-    if (cell.room) S.valueRooms += n * TIERS[v.tier].value;
-    if (v.left <= 0) { cell.dug = true; log('Жила выработана (' + TIERS[v.tier].name + ')'); say('+' + n + ' 💎. Жила пуста.'); }
-    else say('+' + n + ' 💎 ' + TIERS[v.tier].name + '. Осталось ' + v.left + '.');
-    return;
+    say('🛠 Пробил железо (' + cfg.cDrill + '⚡).'); moveInto(nc, nr); afterAct(nc, nr, before); return;
   }
   const cost = cell.dug ? stepCost() : (cell.hard ? cfg.cHard : cfg.cSoft);
-  if (S.energy < cost) { say('Не хватает энергии: нужно ' + cost + '⚡.'); return; }
-  S.energy -= cost; cell.dug = true; act(); say('');
-  moveInto(nc, nr);
+  if (S.energy < cost) { say('Не хватает энергии: нужно ' + cost + '⚡, есть ' + Math.floor(S.energy) + '.'); return; }
+  S.energy -= cost; cell.dug = true; act();
+  moveInto(nc, nr); afterAct(nc, nr, before);
+}
+
+function doFight(nc, nr) {
+  if (!canAct()) return;
+  const cell = S.grid[nr][nc];
+  if (!cell.monster) return;
+  if (S.energy < cfg.cFight) { say('На бой нужно ' + cfg.cFight + '⚡.'); return; }
+  const before = S.energy;
+  S.energy -= cfg.cFight; act();
+  const m = cell.monster, res = fight(m, [nc, nr]);
+  if (res.win) { cell.monster = null; cell.dug = true; moveInto(nc, nr, true); }
+  say(res.text); afterAct(nc, nr, before);
+}
+
+function doMine(nc, nr, all) {
+  if (!canAct()) return;
+  const cell = S.grid[nr][nc], v = cell.vein;
+  if (!v || v.left <= 0) return;
+  const can = Math.floor(S.energy / cfg.cMine);
+  if (can < 1) { say('Нет энергии на добычу (' + cfg.cMine + '⚡ за кристалл).'); return; }
+  const before = S.energy, n = all ? Math.min(can, v.left) : 1;
+  S.energy -= n * cfg.cMine; v.left -= n; S.carry += n; S.value += n * TIERS[v.tier].value; act();
+  if (cell.room) S.valueRooms += n * TIERS[v.tier].value;
+  if (v.left <= 0) { cell.dug = true; log('Жила выработана (' + TIERS[v.tier].name + ')'); say('+' + n + ' 💎. Жила пуста.'); }
+  else say('+' + n + ' 💎 ' + TIERS[v.tier].name + '. Осталось ' + v.left + '.');
+  afterAct(nc, nr, before);
+}
+
+function afterAct(c, r, before) {
+  dirty(); follow = true;
+  const spent = Math.round(before - S.energy);
+  if (spent > 0) floats.push({ c, r, txt: '−' + spent + '⚡ → ' + Math.floor(S.energy), warn: S.energy < ascentCost(), t0: performance.now() });
 }
 
 function moveInto(c, r, quiet) {
@@ -437,19 +509,35 @@ function moveInto(c, r, quiet) {
   }
 }
 
-function evacuate() {
-  if (!canAct()) return;
-  const cost = ascentCost();
-  if (S.energy < cost) { say('На подъём нужно ' + cost + '⚡. Можно подняться частично.'); return; }
-  S.energy -= cost; S.ant = [S.ant[0], 0]; S.evacuated = true; S.evacHour = S.time; act();
-  log('⇧ ЭВАКУАЦИЯ: наверху с ' + S.value + ' поинтами'); say('Ты наверху. Добыча в безопасности.');
+// эвакуация: муравей идёт сам по безопасному пути; если энергии мало — до последней оплаченной клетки
+function evacInfo() {
+  const path = ascentPath();
+  if (!path) return { path: null };
+  const total = path.length - 1, n = Math.min(total, Math.floor(S.energy / stepCost()));
+  return { path, total, n, cost: total * stepCost() };
 }
-function climbPartial() {
+function startClimb() {
   if (!canAct()) return;
-  const p = ascentPath(), n = Math.min(p.length - 1, Math.floor(S.energy / stepCost()));
-  if (n < 1) { say('Нет энергии на подъём.'); return; }
-  if (n === p.length - 1) { evacuate(); return; }
-  S.energy -= n * stepCost(); S.ant = p[n].slice(); act(); say('Поднялся на ' + n + '. До выхода ещё ' + ascentCost() + '⚡.');
+  const e = evacInfo();
+  if (!e.path) { say('Путь наверх перекрыт опасной зоной. Обойди её новым туннелем или победи монстра.'); return; }
+  if (e.total === 0) { act(); finishEvac(); return; }
+  if (e.n < 1) { say('Нет энергии даже на одну клетку подъёма.'); return; }
+  const before = S.energy, full = e.n === e.total;
+  S.energy -= e.n * stepCost(); act(); closeSheet(); follow = true; S.moving = true;
+  let i = 0;
+  const tick = () => {
+    i++; S.ant = e.path[i].slice(); dirty();
+    if (i < e.n) { setTimeout(tick, 70); return; }
+    S.moving = false;
+    if (full) finishEvac();
+    else { say('Поднялся на ' + e.n + ' из ' + e.total + ' кл. До выхода ещё ' + fmtAsc(ascentCost()) + '. Поспи ☾ и продолжи.'); afterAct(S.ant[0], S.ant[1], before); }
+  };
+  setTimeout(tick, 70);
+}
+function finishEvac() {
+  S.ant = [S.ant[0], 0]; S.evacuated = true; S.evacHour = S.time; dirty();
+  log('⇧ ЭВАКУАЦИЯ: наверху с ' + S.value + ' поинтами'); say('Ты наверху. Добыча в безопасности.');
+  vib(30);
 }
 
 // помощь друзей: открыть любую клетку на карте
@@ -474,18 +562,28 @@ function helpAt(c, r) {
   if (S.helpsLeft < 1) setHelp(false);
 }
 function TIERS_NAME(t) { return TOOLS[t].name.toLowerCase(); }
-function setHelp(on) { helpMode = on && S.helpsLeft > 0 && !S.erupted; cv.classList.toggle('help', helpMode); $('bHelp').classList.toggle('on', helpMode); }
+function setHelp(on) {
+  helpMode = on && S.helpsLeft > 0 && !S.erupted;
+  if (helpMode) setInspect(false);
+  if (!helpMode && sel && sel.kind === 'help') closeSheet();
+  $('view').classList.toggle('help', helpMode); $('bHelp').classList.toggle('on', helpMode);
+}
+function setInspect(on) {
+  inspectMode = on;
+  if (on && helpMode) setHelp(false);
+  $('view').classList.toggle('inspect', inspectMode); $('bInspect').classList.toggle('on', inspectMode);
+}
 
 // ---------- время ----------
 function passTime(hours) {
-  if (S.erupted || S.skipping) return;
+  if (S.erupted || S.skipping || S.moving) return;
   closeSession();
-  S.skipping = true; S.acted = false; setHelp(false); say('');
+  S.skipping = true; S.acted = false; setHelp(false); closeSheet();
   const target = S.time + hours;
   const tick = () => {
     advanceClock(Math.min(target, S.time + (S.evacuated ? 2 : 0.25)));
     if (S.erupted) { S.skipping = false; return; }
-    if (S.time < target - 1e-9) requestAnimationFrame(tick); else { S.skipping = false; log('Вернулся. ⚡ ' + Math.floor(S.energy)); }
+    if (S.time < target - 1e-9) requestAnimationFrame(tick); else { S.skipping = false; log('Вернулся. ⚡ ' + Math.floor(S.energy)); say('Вернулся. ⚡ ' + Math.floor(S.energy)); }
   };
   requestAnimationFrame(tick);
 }
@@ -520,7 +618,7 @@ function leaderboard() {
   return { rows, paid, leftover: Math.max(0, poolUsd() - paid) };
 }
 function endSeason() {
-  setHelp(false); closeSession();
+  setHelp(false); closeSheet(); closeSession();
   const sl = S.sessLog, avgMs = sl.length ? sl.reduce((a, x) => a + x.ms, 0) / sl.length : 0, avgAct = sl.length ? Math.round(sl.reduce((a, x) => a + x.actions, 0) / sl.length) : 0;
   const lb = leaderboard(); carryOver = lb.leftover;
   const me = lb.rows.find(r => r.me);
@@ -565,77 +663,181 @@ $('tuning').innerHTML = TUNE.map(([k, l, a, b, st]) => '<div style="margin-top:6
 TUNE.forEach(([k]) => $('t_' + k).oninput = () => { cfg[k] = +$('t_' + k).value; $('v_' + k).textContent = cfg[k]; if (k === 'eMax') S.energy = Math.min(S.energy, cfg.eMax); });
 $('bResetPerm').onclick = () => { perm = { drill: false }; saveJSON('dungeon-perm', perm); S.tools.drill = false; say('Вечные инструменты сброшены.'); };
 
+// ---------- камера ----------
+function cp() { return vw / zoomCols; } // размер клетки в CSS-пикселях
+function sheetH() { return $('sheet').classList.contains('open') ? $('sheet').offsetHeight : 0; }
+function camTarget() {
+  const p = cp(), cols = vw / p, avail = vh - sheetH();
+  return [S.ant[0] + 0.5 - cols / 2, S.ant[1] + 0.5 - avail * 0.42 / p];
+}
+function clampCam() {
+  const p = cp(), cols = vw / p, rows = (vh - sheetH()) / p;
+  camX = cols >= W ? (W - cols) / 2 : Math.max(-0.5, Math.min(W - cols + 0.5, camX));
+  camY = Math.max(-2, Math.min(H - rows + 0.5, camY));
+}
+function zoomAround(mx, my, oldP) {
+  const wx = camX + mx / oldP, wy = camY + my / oldP, p = cp();
+  camX = wx - mx / p; camY = wy - my / p;
+}
+function resetView() {
+  sel = null; sheetKind = null; hold = null; floats = []; flash = null; follow = true;
+  const sh = $('sheet'); if (sh) sh.classList.remove('open');
+  helpMode = false; inspectMode = false;
+  ['view', 'bHelp', 'bInspect'].forEach(id => { const el = $(id); if (el) el.classList.remove('help', 'inspect', 'on'); });
+  antX = S.ant[0]; antY = S.ant[1];
+  const [tx, ty] = camTarget(); camX = tx; camY = ty;
+}
+
 // ---------- отрисовка ----------
 function lerp(a, b, t) { return a + (b - a) * t; }
 function rockColor(r, hard) { const t = r / H, k = hard ? 0.75 : 1; return 'rgb(' + (lerp(42, 70, t) * k | 0) + ',' + (lerp(47, 28, t) * k | 0) + ',' + (lerp(58, 20, t) * k | 0) + ')'; }
-let camC = START_C - 7, camR = 0;
+function vib(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+function adjacent(c, r) { return Math.abs(c - S.ant[0]) + Math.abs(r - S.ant[1]) === 1; }
+function rr(x, y, w, h, rad) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, rad); else ctx.rect(x, y, w, h); }
+function pill(cx, y, txt, bg, fg, fs) {
+  ctx.font = 'bold ' + fs + 'px system-ui, sans-serif';
+  const w = ctx.measureText(txt).width + fs * 0.9, h = fs * 1.6, x = Math.max(3, Math.min(vw - w - 3, cx - w / 2));
+  ctx.fillStyle = bg; rr(x, y, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x + fs * 0.45, y + h / 2 + 0.5); ctx.textBaseline = 'alphabetic';
+  return h;
+}
+// цена действия и что останется
+function preview(c, r, kind) {
+  let cost, asc;
+  if (kind === 'fight') { cost = cfg.cFight; asc = ascentCost(); }
+  else if (kind === 'vein') { cost = cfg.cMine; asc = ascentCost(); }
+  else { const k = classify(c, r); if (k.kind !== 'move') return null; cost = k.cost; asc = ascentCost([c, r], r * W + c); }
+  const left = Math.floor(S.energy - cost);
+  return { cost, left, asc, warn: left < asc, short: S.energy < cost };
+}
+function selKindFor(k) { return k.kind === 'monster' ? 'fight' : k.kind === 'vein' ? 'vein' : (k.kind === 'move' && k.ambush) ? 'ambush' : 'move'; }
+function drawBadge(c, r, pv) {
+  const p = cp(), x = (c - camX) * p + p / 2, top = (r - camY) * p, fs = 12, h = fs * 1.6;
+  const l1 = pv.short ? 'нужно ' + pv.cost + '⚡, есть ' + Math.floor(S.energy) : '−' + pv.cost + '⚡ → останется ' + pv.left + '⚡';
+  const l2 = !pv.short && pv.warn ? '⚠ на подъём не хватит (' + fmtAsc(pv.asc) + ')' : null;
+  const lines = l2 ? 2 : 1, below = r > S.ant[1] || top - lines * (h + 2) - 4 < 0; // бейдж — со стороны от муравья
+  let y = below ? top + p + 4 : top - lines * (h + 2) - 2;
+  if (l2) { pill(x, y, l2, '#ffd166', '#1a0f08', fs); y += h + 2; }
+  pill(x, y, l1, pv.short ? '#7a1f1f' : 'rgba(10,8,7,.9)', '#fff', fs);
+}
+
 function draw() {
-  const tc = Math.max(0, Math.min(W - VIEW_COLS, S.ant[0] - 7)), tr = Math.max(0, Math.min(H - VIEW_ROWS, S.ant[1] - Math.floor(VIEW_ROWS * 0.4)));
-  camC += (tc - camC) * 0.18; camR += (tr - camR) * 0.18;
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  const c0 = Math.floor(camC), r0 = Math.floor(camR), ox = (camC - c0) * CELL, oy = (camR - r0) * CELL;
-  for (let vr = -1; vr <= VIEW_ROWS + 1; vr++) for (let vc = -1; vc <= VIEW_COLS + 1; vc++) {
-    const r = r0 + vr, c = c0 + vc; if (!inb(c, r)) continue;
-    const cell = S.grid[r][c], x = vc * CELL - ox, y = vr * CELL - oy;
-    if (r === 0) { ctx.fillStyle = '#4a5866'; ctx.fillRect(x, y, CELL, CELL); continue; }
-    if (!cell.seen) { ctx.fillStyle = '#0b0a09'; ctx.fillRect(x, y, CELL, CELL); continue; }
+  const now = performance.now();
+  if (Math.abs(zoomTarget - zoomCols) > 0.01) { const old = cp(); zoomCols += (zoomTarget - zoomCols) * 0.2; if (!follow) zoomAround(vw / 2, (vh - sheetH()) / 2, old); }
+  if (follow) { const [tx, ty] = camTarget(); camX += (tx - camX) * 0.16; camY += (ty - camY) * 0.16; }
+  clampCam();
+  antX += (S.ant[0] - antX) * 0.35; antY += (S.ant[1] - antY) * 0.35;
+  const p = cp(), s = p / 26;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, vh);
+  const c0 = Math.floor(camX), r0 = Math.floor(camY), ncols = Math.ceil(vw / p) + 1, nrows = Math.ceil(vh / p) + 1;
+  for (let r = r0; r <= r0 + nrows; r++) for (let c = c0; c <= c0 + ncols; c++) {
+    const x = (c - camX) * p, y = (r - camY) * p;
+    if (r < 0) { ctx.fillStyle = r === -1 ? '#2b3a48' : '#1c2733'; ctx.fillRect(x, y, p + 1, p + 1); continue; }
+    if (!inb(c, r)) { ctx.fillStyle = '#060505'; ctx.fillRect(x, y, p + 1, p + 1); continue; }
+    const cell = S.grid[r][c];
+    if (r === 0) { ctx.fillStyle = '#4a5866'; ctx.fillRect(x, y, p + 1, p + 1); continue; }
+    if (!cell.seen) { ctx.fillStyle = '#0b0a09'; ctx.fillRect(x, y, p + 1, p + 1); continue; }
     if (cell.iron) {
-      ctx.fillStyle = cell.roomWall ? '#3e4450' : '#5d6672'; ctx.fillRect(x, y, CELL, CELL);
-      ctx.fillStyle = cell.roomWall ? '#c9a24a' : '#8e97a3'; for (const [px, py] of [[5, 5], [CELL - 7, 5], [5, CELL - 7], [CELL - 7, CELL - 7]]) ctx.fillRect(x + px, y + py, 3, 3);
-      ctx.strokeStyle = '#2b3036'; ctx.strokeRect(x + .5, y + .5, CELL - 1, CELL - 1); continue;
+      ctx.fillStyle = cell.roomWall ? '#3e4450' : '#5d6672'; ctx.fillRect(x, y, p + 1, p + 1);
+      ctx.fillStyle = cell.roomWall ? '#c9a24a' : '#8e97a3';
+      const m = 5 * s, sz = 3 * s; for (const [px, py] of [[m, m], [p - m - sz, m], [m, p - m - sz], [p - m - sz, p - m - sz]]) ctx.fillRect(x + px, y + py, sz, sz);
+      ctx.strokeStyle = '#2b3036'; ctx.strokeRect(x + .5, y + .5, p - 1, p - 1); continue;
     }
     if (cell.room && cell.dug) ctx.fillStyle = '#3a2c3e'; else if (cell.dug) ctx.fillStyle = '#6b5442'; else ctx.fillStyle = rockColor(r, cell.hard);
-    ctx.fillRect(x, y, CELL, CELL);
-    if (!cell.dug && cell.hard) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 6, y + 6, 4, 4); ctx.fillRect(x + 15, y + 14, 5, 5); }
-    if (!cell.monster && aggroNear(c, r)) { ctx.fillStyle = 'rgba(255,40,60,.28)'; ctx.fillRect(x, y, CELL, CELL); }
+    ctx.fillRect(x, y, p + 1, p + 1);
+    if (!cell.dug && cell.hard) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 6 * s, y + 6 * s, 4 * s, 4 * s); ctx.fillRect(x + 15 * s, y + 14 * s, 5 * s, 5 * s); }
+    if (!cell.monster && aggroNear(c, r)) { ctx.fillStyle = 'rgba(255,40,60,.28)'; ctx.fillRect(x, y, p + 1, p + 1); }
     if (cell.vein && cell.vein.left > 0) {
-      const t = TIERS[cell.vein.tier], g = ctx.createRadialGradient(x + CELL / 2, y + CELL / 2, 2, x + CELL / 2, y + CELL / 2, CELL * 0.75);
-      g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - 6, y - 6, CELL + 12, CELL + 12);
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('~' + (cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est), x + CELL / 2, y + CELL / 2 + 4);
+      const t = TIERS[cell.vein.tier], g = ctx.createRadialGradient(x + p / 2, y + p / 2, 2, x + p / 2, y + p / 2, p * 0.75);
+      g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - p * 0.23, y - p * 0.23, p * 1.46, p * 1.46);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold ' + (10 * s) + 'px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('~' + (cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est), x + p / 2, y + p / 2 + 4 * s);
     }
     if (cell.shard) {
       ctx.fillStyle = TOOLS[cell.shard].color; ctx.beginPath();
-      ctx.moveTo(x + CELL / 2, y + 5); ctx.lineTo(x + CELL - 6, y + CELL / 2); ctx.lineTo(x + CELL / 2, y + CELL - 5); ctx.lineTo(x + 6, y + CELL / 2); ctx.closePath(); ctx.fill();
+      ctx.moveTo(x + p / 2, y + 5 * s); ctx.lineTo(x + p - 6 * s, y + p / 2); ctx.lineTo(x + p / 2, y + p - 5 * s); ctx.lineTo(x + 6 * s, y + p / 2); ctx.closePath(); ctx.fill();
     }
     if (cell.monster) {
       const guard = cell.monster.kind === 'guard';
-      ctx.fillStyle = guard ? '#c4122f' : '#7b2d9e'; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
-      ctx.strokeStyle = guard ? '#ffd166' : '#ff5c8a'; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3); ctx.lineWidth = 1;
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText((guard ? '👹' : '!') + cell.monster.power, x + CELL / 2, y + CELL / 2 + 4);
+      ctx.fillStyle = guard ? '#c4122f' : '#7b2d9e'; ctx.fillRect(x + 1, y + 1, p - 2, p - 2);
+      ctx.strokeStyle = guard ? '#ffd166' : '#ff5c8a'; ctx.lineWidth = 2 * s; ctx.strokeRect(x + s * 1.5, y + s * 1.5, p - 3 * s, p - 3 * s); ctx.lineWidth = 1;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold ' + (11 * s) + 'px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText((guard ? '👹' : '!') + cell.monster.power, x + p / 2, y + p / 2 + 4 * s);
     }
-    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(x + .5, y + .5, CELL - 1, CELL - 1);
+    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.strokeRect(x + .5, y + .5, p - 1, p - 1);
   }
   const haz = hazardAt(Math.floor(S.time) + 1), glow = Math.min(0.85, 0.15 + haz * 9);
-  const g2 = ctx.createLinearGradient(0, cv.height - 220, 0, cv.height);
+  const g2 = ctx.createLinearGradient(0, vh - 220, 0, vh);
   g2.addColorStop(0, 'rgba(255,80,20,0)'); g2.addColorStop(1, 'rgba(255,80,20,' + glow * Math.min(1, (S.ant[1] + 10) / H) + ')');
-  ctx.fillStyle = g2; ctx.fillRect(0, 0, cv.width, cv.height);
-  const ax = (S.ant[0] - camC) * CELL + CELL / 2, ay = (S.ant[1] - camR) * CELL + CELL / 2;
-  ctx.fillStyle = S.energy < 1 ? '#8a6a52' : '#ff8a3d';
-  ctx.beginPath(); ctx.ellipse(ax, ay + 2, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(ax, ay - 6, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1.5;
-  for (const s of [-1, 1]) for (const k of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(ax + s * 5, ay + 2 + k / 2); ctx.lineTo(ax + s * 10, ay + 5 + k); ctx.stroke(); }
-  ctx.lineWidth = 1;
-  // мини-карта глубины справа
-  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(cv.width - 8, 4, 4, cv.height - 8);
-  ctx.fillStyle = '#ff8a3d'; ctx.fillRect(cv.width - 10, 4 + (cv.height - 8) * S.ant[1] / H - 2, 8, 4);
-  if (S.skipping) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Время идёт… ' + fmtTime(S.time), cv.width / 2, 30); }
-  if (S.erupted) { ctx.fillStyle = 'rgba(255,60,20,.55)'; ctx.fillRect(0, 0, cv.width, cv.height); }
-}
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, vw, vh);
+  const sx = c => (c - camX) * p, sy = r => (r - camY) * p;
 
-function neighborInfo(d) {
-  const [dc, dr] = DIRS[d], nc = S.ant[0] + dc, nr = S.ant[1] + dr;
-  if (!inb(nc, nr) || nr < 1) return 'край';
-  const cell = S.grid[nr][nc];
-  if (cell.iron && cell.roomWall) return 'стена комнаты ✖';
-  if (cell.iron) return S.tools.drill ? 'железо · бур ' + cfg.cDrill + '⚡' : 'железо ✖';
-  if (cell.monster) return (cell.monster.kind === 'guard' ? '👹 ' : '! ') + cell.monster.power + ' · ' + Math.round(winChance(cell.monster) * 100) + '% · ' + cfg.cFight + '⚡';
-  let warn = !cell.monster && aggroNear(nc, nr) ? ' ⚠️' : '';
-  if (cell.vein && cell.vein.left > 0) { const n = cell.vein.left < cell.vein.size ? cell.vein.left : cell.vein.est; return TIERS[cell.vein.tier].name.slice(0, 4) + ' ~' + n + ' · ' + (mineAll ? n * cfg.cMine + '⚡' : cfg.cMine + '⚡/шт') + warn; }
-  if (cell.dug) return 'проход · ' + stepCost() + '⚡' + warn;
-  return (cell.hard ? 'твёрдая · ' + cfg.cHard : 'мягкая · ' + cfg.cSoft) + '⚡' + warn;
+  // путь наверх, пока держишь кнопку
+  if (hold) {
+    const e = evacInfo();
+    if (e.path) e.path.forEach(([c, r], i) => { if (!i) return; ctx.fillStyle = i <= e.n ? 'rgba(61,220,132,.9)' : 'rgba(255,77,77,.9)'; ctx.beginPath(); ctx.arc(sx(c) + p / 2, sy(r) + p / 2, Math.max(3, p * 0.13), 0, Math.PI * 2); ctx.fill(); });
+  }
+  // рамка помощи друга 3×3
+  if (helpMode) {
+    const t = sel && sel.kind === 'help' ? sel : hoverCell && inb(hoverCell[0], hoverCell[1]) && !S.grid[hoverCell[1]][hoverCell[0]].seen ? { c: hoverCell[0], r: hoverCell[1] } : null;
+    if (t) {
+      ctx.fillStyle = sel && sel.kind === 'help' ? 'rgba(61,220,132,.22)' : 'rgba(61,220,132,.1)'; ctx.fillRect(sx(t.c - 1), sy(t.r - 1), p * 3, p * 3);
+      ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 3; ctx.strokeRect(sx(t.c - 1) + 1.5, sy(t.r - 1) + 1.5, p * 3 - 3, p * 3 - 3);
+      ctx.lineWidth = 1.5; ctx.strokeRect(sx(t.c) + 1, sy(t.r) + 1, p - 2, p - 2); ctx.lineWidth = 1;
+    }
+  }
+  // метки цены у соседних клеток
+  if (canAct() && !helpMode && !inspectMode && !hold) {
+    const fs = Math.max(9, Math.min(12, 9 * s));
+    for (const [dc, dr] of Object.values(DIRS)) {
+      const c = S.ant[0] + dc, r = S.ant[1] + dr, k = classify(c, r);
+      if (k.kind === 'blocked') continue;
+      let txt, bg = 'rgba(10,8,7,.82)', fg = '#fff';
+      if (k.kind === 'monster') { txt = '⚔' + Math.round(winChance(k.m) * 100) + '%'; bg = 'rgba(120,20,30,.9)'; }
+      else if (k.kind === 'vein') txt = '⛏' + cfg.cMine;
+      else { const pv = preview(c, r, 'move'); txt = (k.ambush ? '! ' : pv.warn ? '⚠' : '−') + k.cost; if (k.ambush) bg = 'rgba(150,20,30,.92)'; else if (pv.warn || pv.short) { bg = '#ffd166'; fg = '#1a0f08'; } }
+      pill(sx(c) + p / 2, sy(r) + p - fs * 1.6 - 2, txt, bg, fg, fs);
+    }
+  }
+  // выделенная клетка
+  if (sel && sel.kind !== 'help') {
+    const a = 0.55 + 0.45 * Math.sin(now / 160);
+    ctx.strokeStyle = sel.kind === 'ambush' || sel.kind === 'fight' ? 'rgba(255,209,102,' + a + ')' : sel.kind === 'info' ? 'rgba(74,163,255,' + a + ')' : 'rgba(255,255,255,' + a + ')';
+    ctx.lineWidth = 3; ctx.strokeRect(sx(sel.c) + 1.5, sy(sel.r) + 1.5, p - 3, p - 3); ctx.lineWidth = 1;
+  }
+  if (flash && now - flash.t0 < 450) { ctx.strokeStyle = 'rgba(255,255,255,' + (1 - (now - flash.t0) / 450) + ')'; ctx.lineWidth = 2; ctx.strokeRect(sx(flash.c) + 1, sy(flash.r) + 1, p - 2, p - 2); ctx.lineWidth = 1; }
+  // муравей
+  const ax = (antX - camX) * p + p / 2, ay = (antY - camY) * p + p / 2;
+  ctx.fillStyle = S.energy < 1 ? '#8a6a52' : '#ff8a3d';
+  ctx.beginPath(); ctx.ellipse(ax, ay + 2 * s, 7 * s, 5 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ax, ay - 6 * s, 4 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1.5 * s;
+  for (const sg of [-1, 1]) for (const k of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(ax + sg * 5 * s, ay + (2 + k / 2) * s); ctx.lineTo(ax + sg * 10 * s, ay + (5 + k) * s); ctx.stroke(); }
+  ctx.lineWidth = 1;
+  // бейдж цены: выбранная клетка или наведение мышью
+  if (canAct()) {
+    if (sel && (sel.kind === 'fight' || sel.kind === 'vein' || sel.kind === 'ambush') && adjacent(sel.c, sel.r)) { const pv = preview(sel.c, sel.r, sel.kind); if (pv) drawBadge(sel.c, sel.r, pv); }
+    else if (!sel && hoverCell && !helpMode && !inspectMode && adjacent(hoverCell[0], hoverCell[1])) {
+      const k = classify(hoverCell[0], hoverCell[1]);
+      if (k.kind !== 'blocked') { const pv = preview(hoverCell[0], hoverCell[1], selKindFor(k)); if (pv) drawBadge(hoverCell[0], hoverCell[1], pv); }
+    }
+  }
+  // всплывающая цена после действия
+  floats = floats.filter(f => now - f.t0 < 1200);
+  for (const f of floats) {
+    const age = (now - f.t0) / 1200; ctx.globalAlpha = 1 - age * age;
+    pill(sx(f.c) + p / 2, sy(f.r) - 6 - age * p * 0.9, f.txt + (f.warn ? ' ⚠' : ''), f.warn ? '#ffd166' : 'rgba(10,8,7,.9)', f.warn ? '#1a0f08' : '#ffd166', 12);
+    ctx.globalAlpha = 1;
+  }
+  // мини-карта глубины справа
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(vw - 8, 60, 4, vh - 68 - sheetH());
+  ctx.fillStyle = '#ff8a3d'; ctx.fillRect(vw - 10, 60 + (vh - 68 - sheetH()) * S.ant[1] / H - 2, 8, 4);
+  if (S.skipping) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, vw, vh); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Время идёт… ' + fmtTime(S.time), vw / 2, vh / 2); }
+  if (S.erupted) { ctx.fillStyle = 'rgba(255,60,20,.55)'; ctx.fillRect(0, 0, vw, vh); }
+  // кнопка «◎», когда муравей за кадром
+  const off = ax < 0 || ax > vw || ay < 0 || ay > vh - sheetH();
+  $('bCenter').classList.toggle('show', off);
 }
 
 function renderTools() {
@@ -651,94 +853,309 @@ function renderTools() {
   if ($('tools').dataset.v !== h) { $('tools').innerHTML = h; $('tools').dataset.v = h; }
 }
 
+function setText(id, v) { const el = $(id); if (el.textContent !== v) el.textContent = v; }
 function updateUI() {
-  $('hDay').textContent = Math.floor(S.time / 24) + 1;
-  $('hHour').textContent = String(Math.floor(S.time % 24)).padStart(2, '0') + ':' + String(Math.floor((S.time % 1) * 60)).padStart(2, '0');
+  setText('hDay', String(Math.floor(S.time / 24) + 1));
+  setText('hHour', String(Math.floor(S.time % 24)).padStart(2, '0') + ':' + String(Math.floor((S.time % 1) * 60)).padStart(2, '0'));
   const haz = hazardAt(Math.floor(S.time) + 1);
-  $('hHaz').textContent = fmtPct(haz); $('hHaz').style.color = haz < 0.002 ? 'var(--ok)' : haz < 0.02 ? '#ffd166' : 'var(--danger)';
-  $('hEnergy').textContent = Math.floor(S.energy) + '/' + cfg.eMax + (injured() ? ' 🩹' : ''); $('hEbar').style.width = (100 * S.energy / cfg.eMax) + '%';
+  setText('hHaz', fmtPct(haz)); $('hHaz').style.color = haz < 0.002 ? 'var(--ok)' : haz < 0.02 ? '#ffd166' : 'var(--danger)';
+  setText('hCarry', String(S.carry)); setText('hPts', S.value + ' п.'); setText('hDepth', String(S.ant[1]));
   const left = S.bots.filter(b => b.left).length;
-  $('hCrowd').textContent = (BOTS - left) + (S.evacuated ? 0 : 1); $('hLeft').textContent = left + (S.evacuated ? 1 : 0);
-  $('hPool').textContent = '$' + poolUsd().toFixed(0) + (S.carryIn ? ' (+' + S.carryIn.toFixed(0) + ')' : '');
-  $('sCarry').textContent = S.carry + ' 💎'; $('sValue').textContent = 'поинты ' + S.value;
-  $('sDepth').textContent = S.ant[1]; $('sPower').textContent = antPower();
-  const asc = ascentCost();
-  $('sAscent').textContent = S.evacuated ? 'наверху' : asc + '⚡'; $('sAscent').style.color = !S.evacuated && S.energy < asc ? 'var(--danger)' : '';
-  $('sSess').textContent = S.sessStart === null ? '⏱ Заход начнётся с первого действия' : '⏱ Этот заход: ' + fmtClock(performance.now() - S.sessStart) + ' · действий ' + S.sessActions;
-  $('sNote').textContent = S.evacuated ? 'Эвакуирован в ' + fmtTime(S.evacHour) + '. Ждём взрыва.' :
-    'Полная энергия через ' + ((cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1)).toFixed(1) + ' ч.' + (S.energy < asc ? ' ⚠️ На эвакуацию энергии НЕ хватает.' : '');
-  for (const [d, id, mid] of [['up', 'nUp', 'mUp'], ['down', 'nDown', 'mDown'], ['left', 'nLeft', 'mLeft'], ['right', 'nRight', 'mRight']]) { const v = neighborInfo(d); if ($(id).textContent !== v) { $(id).textContent = v; $(mid).textContent = v; } }
-  const off = !canAct();
-  document.querySelectorAll('[data-dir]').forEach(b => b.disabled = off);
-  $('bEvac').disabled = off; $('bClimb').disabled = off;
-  $('mEvacC').textContent = S.evacuated ? 'наверху' : asc + '⚡'; $('mEvac').disabled = off; $('mClimb').disabled = off;
-  $('mHelpN').textContent = 'друзья ' + S.helpsLeft; $('mHelp').disabled = S.erupted || S.skipping || S.helpsLeft < 1; $('mHelp').classList.toggle('on', helpMode); $('bEvac').textContent = '⇧ ЭВАКУАЦИЯ (' + asc + '⚡)';
-  $('bHelp').disabled = S.erupted || S.skipping || S.helpsLeft < 1;
-  $('helpNote').textContent = 'сегодня осталось ' + S.helpsLeft + ' из ' + cfg.friendHelps + (helpMode ? ' — тапни по скрытой клетке' : '');
-  document.querySelectorAll('[data-skip]').forEach(b => b.disabled = S.skipping || S.erupted);
-  $('bFull').disabled = S.skipping || S.erupted || S.energy >= cfg.eMax - 0.5;
-  let surv = 1; for (let h = Math.floor(S.time) + 1; h <= Math.floor(S.time) + 8; h++) surv *= 1 - hazardAt(h);
-  $('skipNote').textContent = S.evacuated ? 'Ты наверху — промотай время до взрыва.' : 'Сон 8 ч: шанс взрыва ' + ((1 - surv) * 100).toFixed(1) + '%. ' + (S.energy >= asc ? 'На подъём хватает.' : 'На подъём НЕ хватает.');
+  setText('hCrowd', String((BOTS - left) + (S.evacuated ? 0 : 1))); setText('hLeft', String(left + (S.evacuated ? 1 : 0)));
+  setText('hPool', '$' + poolUsd().toFixed(0) + (S.carryIn ? ' (+' + S.carryIn.toFixed(0) + ')' : ''));
+  setText('sCarry', S.carry + ' 💎'); setText('sValue', 'поинты ' + S.value);
+  setText('sDepth', String(S.ant[1])); setText('sPower', String(antPower()));
+  const asc = ascentCost(), lowAsc = !S.evacuated && S.energy < asc;
+  setText('sAscent', S.evacuated ? 'наверху' : fmtAsc(asc)); $('sAscent').style.color = lowAsc ? 'var(--danger)' : '';
+  setText('sSess', S.sessStart === null ? '⏱ Заход начнётся с первого действия' : '⏱ Этот заход: ' + fmtClock(performance.now() - S.sessStart) + ' · действий ' + S.sessActions);
+  setText('sNote', S.evacuated ? 'Эвакуирован в ' + fmtTime(S.evacHour) + '. Ждём взрыва.' :
+    'Полная энергия через ' + ((cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1)).toFixed(1) + ' ч.' + (lowAsc ? ' ⚠️ На эвакуацию энергии НЕ хватает.' : ''));
+  // панель
+  setText('bEn', '⚡' + Math.floor(S.energy));
+  setText('bEnAsc', (injured() ? '🩹' : '') + (S.evacuated ? 'наверху' : '⬆' + fmtAsc(asc)));
+  $('bEnergy').classList.toggle('low', lowAsc); $('eFill').style.width = (100 * S.energy / cfg.eMax) + '%';
+  let t, sub, w = false;
+  if (S.evacuated) { t = 'Наверху ✓'; sub = 'ждём взрыва'; }
+  else {
+    const e = evacInfo();
+    if (!e.path) { t = 'Наверх'; sub = '⚠ перекрыт'; w = true; }
+    else if (e.total === 0) { t = 'Выйти'; sub = 'у выхода · держи'; }
+    else { t = 'Наверх −' + e.cost + '⚡'; if (e.n >= e.total) sub = e.total + ' кл. · держи'; else { sub = '⚠ хватит до ' + e.n + '/' + e.total; w = true; } }
+  }
+  setText('bEvacT', t); setText('bEvacS', sub); $('bEvacS').classList.toggle('w', w);
+  $('bEvac').disabled = !canAct() && !hold;
+  setText('bHelpN', String(S.helpsLeft)); $('bHelp').disabled = S.erupted || S.skipping || S.helpsLeft < 1;
+  $('bSleep').disabled = S.skipping || S.erupted || S.moving;
   const html = S.feed.slice(0, 40).map(l => '<div>' + l + '</div>').join('');
   if ($('feed').dataset.v !== html) { $('feed').innerHTML = html; $('feed').dataset.v = html; }
   renderTools();
 }
 
-// ---------- ввод ----------
-document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => doStep(b.dataset.dir));
-document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => passTime(S.evacuated ? 24 : +b.dataset.skip));
-$('bFull').onclick = () => passTime(Math.max(0.25, (cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1)));
-$('bEvac').onclick = evacuate; $('bClimb').onclick = climbPartial;
-function toggleMine() { mineAll = !mineAll; $('bMineMode').innerHTML = mineAll ? '⛏ всё<small>вся жила</small>' : '⛏ ×1<small>по одному</small>'; $('mMine').innerHTML = mineAll ? '⛏<small>вся жила</small>' : '⛏<small>×1</small>'; }
-$('bMineMode').onclick = toggleMine;
-$('bHelp').onclick = () => setHelp(!helpMode);
-// карта: тап по клетке — шаг в её сторону (или помощь друга), свайп — шаг в сторону свайпа
-function cellAtPoint(x, y) {
-  const rect = cv.getBoundingClientRect(), sx = cv.width / rect.width, sy = cv.height / rect.height;
-  return [Math.floor(((x - rect.left) * sx) / CELL + camC), Math.floor(((y - rect.top) * sy) / CELL + camR)];
-}
-let pDown = null;
-cv.addEventListener('pointerdown', e => { pDown = { x: e.clientX, y: e.clientY }; });
-cv.addEventListener('pointerup', e => {
-  if (!pDown) return;
-  const dx = e.clientX - pDown.x, dy = e.clientY - pDown.y; pDown = null;
-  if (Math.hypot(dx, dy) > 24) { if (!helpMode) doStep(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); return; }
-  const [c, r] = cellAtPoint(e.clientX, e.clientY);
-  if (helpMode) { if (inb(c, r) && r > 0) helpAt(c, r); return; }
-  const ddx = c - S.ant[0], ddy = r - S.ant[1];
-  if (!ddx && !ddy) return;
-  doStep(Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up'));
-});
-cv.addEventListener('pointercancel', () => { pDown = null; });
-// пульт внизу (телефон)
-$('mHelp').onclick = () => setHelp(!helpMode);
-$('mMine').onclick = toggleMine;
-$('mEvac').onclick = evacuate; $('mClimb').onclick = climbPartial;
-$('mSleep').onclick = () => $('mSkips').classList.toggle('open');
-$('mFull').onclick = () => { $('mSkips').classList.remove('open'); $('bFull').onclick(); };
-document.querySelectorAll('#mSkips [data-skip]').forEach(b => b.addEventListener('click', () => $('mSkips').classList.remove('open')));
-$('mInfo').onclick = () => { const d = document.querySelector('details.card'); d.open = true; d.scrollIntoView({ behavior: 'smooth' }); };
-// высота карты под экран телефона
-function fitCanvas() {
-  const mobile = window.matchMedia('(max-width: 760px)').matches;
-  let rows = 24;
-  if (mobile) {
-    const bar = $('mbar').getBoundingClientRect().height || 170, head = document.querySelector('header').getBoundingClientRect().height || 50;
-    document.body.style.setProperty('--mbar-h', bar + 'px');
-    const cssW = Math.min(window.innerWidth - 16, 760), avail = window.innerHeight - bar - head - 20;
-    rows = Math.max(10, Math.min(24, Math.floor(avail * (cv.width / cssW) / CELL)));
+// ---------- шторка ----------
+function openSheet(kind) { sheetKind = kind; sheetOpenedAt = performance.now(); renderSheet(); if (sheetKind) $('sheet').classList.add('open'); }
+function closeSheet() { sel = null; sheetKind = null; $('sheet').classList.remove('open'); }
+function select(c, r, kind) { sel = { c, r, kind, t: performance.now() }; if (kind !== 'help' && kind !== 'info') follow = true; openSheet(kind); }
+function cap1(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function renderSheet() {
+  const k = sheetKind;
+  let h = '';
+  if (k === 'vein' || k === 'fight' || k === 'ambush') {
+    const cl = sel && canAct() && adjacent(sel.c, sel.r) ? classify(sel.c, sel.r) : null;
+    if (!cl || selKindFor(cl) !== k) { closeSheet(); return; }
+    if (k === 'vein') {
+      const v = cl.v, t = TIERS[v.tier], known = v.left < v.size, n = known ? v.left : v.est, can = Math.floor(S.energy / cfg.cMine), all = Math.min(can, n), tl = known ? '' : '~';
+      const warnAll = S.energy - all * cfg.cMine < ascentCost();
+      h = '<h4><span style="color:' + t.color + '">●</span> ' + cap1(t.name) + ' жила · ' + tl + n + ' 💎</h4>' +
+        '<div class="muted">Кристалл = ' + t.value + ' п. · добыча ' + cfg.cMine + '⚡ за штуку.' + (known ? '' : ' Размер примерный.') + '</div>' +
+        (warnAll ? '<div class="wline">⚠ После всей жилы на подъём не хватит (' + fmtAsc(ascentCost()) + ').</div>' : '') +
+        '<div class="acts"><button data-act="mine1"' + (can < 1 ? ' disabled' : '') + '>Добыть 1<small>−' + cfg.cMine + '⚡</small></button>' +
+        '<button data-act="mineAll" class="primary"' + (can < 1 ? ' disabled' : '') + '>Всю жилу<small>' + tl + '−' + all * cfg.cMine + '⚡' + (all < n ? ' · хватит на ' + all : '') + '</small></button></div>' +
+        '<div class="hint">Тапни жилу ещё раз — добыть 1.</div>';
+    } else if (k === 'fight') {
+      const m = cl.m, guard = m.kind === 'guard', ch = winChance(m), pct = Math.round(ch * 100), short = S.energy < cfg.cFight;
+      h = '<h4>' + (guard ? '👹 Сторож комнаты' : '! Монстр') + ' · сила ' + m.power + ' <span class="muted">(ты ' + antPower() + ')</span></h4>' +
+        '<div class="chance" style="color:' + (ch >= 0.6 ? 'var(--ok)' : ch >= 0.35 ? 'var(--energy)' : 'var(--danger)') + '">' + pct + '%<small> шанс победы</small></div>' +
+        '<div class="muted">Цена боя ' + cfg.cFight + '⚡. Победа — трофей ~' + Math.max(1, Math.round(m.power * 0.5)) + ' 💎' + (guard ? ', вход в комнату, шанс снаряги' : '') + '. ' +
+        '<b style="color:var(--text)">Поражение — ранен на ' + cfg.injuryHours + ' ч</b> (энергия копится ×' + cfg.injuryRegen + '), монстр остаётся.</div>' +
+        '<div class="acts"><button data-act="fight" data-guard="1" class="risk"' + (short ? ' disabled' : '') + '>⚔ Бой<small>' + (short ? 'нужно ' + cfg.cFight + '⚡' : '−' + cfg.cFight + '⚡') + '</small></button>' +
+        '<button data-act="cancel" class="safe">Назад</button></div>' +
+        '<div class="hint">Или тапни монстра ещё раз.</div>';
+    } else {
+      const a = cl.ambush, pct = Math.round(winChance(a.m) * 100);
+      h = '<h4 class="warn">⚠ Засада: опасная зона</h4>' +
+        '<div>Рядом агрессивный монстр, сила ' + a.m.power + '. Шагнёшь сюда — он нападёт сразу: бой без цены энергии, шанс победы <b>' + pct + '%</b>. Поражение — ранение на ' + cfg.injuryHours + ' ч.</div>' +
+        '<div class="acts"><button data-act="go" data-guard="1" class="risk">Всё равно идти<small>−' + cl.cost + '⚡</small></button>' +
+        '<button data-act="cancel" class="safe">Отмена</button></div>' +
+        '<div class="hint">Или тапни клетку ещё раз.</div>';
+    }
+  } else if (k === 'help') {
+    h = '<h4>🤝 Помощь друга</h4><div class="muted">Друг откроет область 3×3 вокруг клетки (зелёная рамка). Осталось сегодня: ' + S.helpsLeft + ' из ' + cfg.friendHelps + '.</div>' +
+      '<div class="acts"><button data-act="cancel">Отмена</button><button data-act="help" class="primary">Открыть 3×3</button></div>' +
+      '<div class="hint">Или тапни эту клетку ещё раз. Другая скрытая клетка — передвинуть рамку.</div>';
+  } else if (k === 'info') {
+    h = '<h4>Что здесь</h4><div>' + describeCell(sel.c, sel.r) + '</div><div class="acts"><button data-act="close">Понятно</button></div>';
+  } else if (k === 'sleep') {
+    const asc = ascentCost();
+    let surv = 1; for (let hh = Math.floor(S.time) + 1; hh <= Math.floor(S.time) + 8; hh++) surv *= 1 - hazardAt(hh);
+    const full = (cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1);
+    h = '<h4>☾ Уйти из игры — время пойдёт</h4>' +
+      (S.evacuated ? '<div class="muted">Ты наверху — промотай время до взрыва.</div><div class="acts"><button data-act="sleep" data-v="24" class="primary">Промотать сутки</button></div>' :
+      '<div class="muted">Сон 8 ч: шанс взрыва ' + ((1 - surv) * 100).toFixed(1) + '%. ' + (S.energy >= asc ? 'На подъём хватает.' : '<span class="wline">⚠ На подъём НЕ хватает (' + fmtAsc(asc) + ').</span>') +
+      ' Полная энергия через ' + full.toFixed(1) + ' ч.</div>' +
+      '<div class="acts four"><button data-act="sleep" data-v="1">1 ч</button><button data-act="sleep" data-v="3">3 ч</button><button data-act="sleep" data-v="8" class="primary">8 ч</button>' +
+      '<button data-act="full"' + (S.energy >= cfg.eMax - 0.5 ? ' disabled' : '') + '>до полной</button></div>');
+  } else if (k === 'energy') {
+    const asc = ascentCost(), e = S.evacuated ? null : evacInfo();
+    h = '<h4>⚡ Энергия ' + Math.floor(S.energy) + ' из ' + cfg.eMax + '</h4>' +
+      '<div class="muted">Копится сама: полная шкала за ' + (cfg.regenHours / (injured() ? cfg.injuryRegen : 1)).toFixed(0) + ' ч' + (injured() ? ' (ранен до ' + fmtTime(S.injuryUntil) + ')' : '') + '. ' +
+      'Шаг по туннелю ' + stepCost() + '⚡, мягкая ' + cfg.cSoft + ', твёрдая ' + cfg.cHard + ', кристалл ' + cfg.cMine + ', бой ' + cfg.cFight + '.</div>' +
+      '<div style="margin-top:6px">' + (S.evacuated ? 'Ты наверху.' : !e.path ? '⚠ Путь наверх перекрыт опасной зоной.' : 'Подъём сейчас: <b>' + fmtAsc(asc) + '</b> (' + e.total + ' кл.)' + (e.n < e.total ? ' — <span class="wline">⚠ хватит до клетки ' + e.n + '</span>' : ' — хватает.')) + '</div>';
   }
-  if (rows !== VIEW_ROWS || cv.height !== rows * CELL) { VIEW_ROWS = rows; cv.height = rows * CELL; }
+  $('sheetBody').innerHTML = h;
+  const guarded = $('sheetBody').querySelectorAll('[data-guard]');
+  guarded.forEach(b => b.classList.add('arming'));
+  if (guarded.length) setTimeout(() => guarded.forEach(b => b.classList.remove('arming')), GUARD_MS);
+}
+function describeCell(c, r) {
+  if (r < 0) return 'Небо над вулканом.';
+  if (!inb(c, r)) return 'За краем поля.';
+  if (r === 0) return 'Поверхность — выход. Сюда только кнопкой «⬆ Наверх» (удержание).';
+  const cell = S.grid[r][c], d = Math.abs(c - S.ant[0]) + Math.abs(r - S.ant[1]), out = [];
+  if (!d) return '🐜 Твой муравей. Сила ' + antPower() + (injured() ? ', ранен до ' + fmtTime(S.injuryUntil) : '') + '. Несёт ' + S.carry + ' 💎 (' + S.value + ' п.). Глубина ' + r + '.';
+  if (!cell.seen) return '❔ Скрыто. Подойди ближе, собери 🔦 фонарь или позови друга 🤝.';
+  if (cell.iron && cell.roomWall) out.push('Стена комнаты — не пробить ничем. Вход только через сторожа.');
+  else if (cell.iron) out.push('Железо — не пройти. ' + (S.tools.drill ? 'Бур пробьёт за ' + cfg.cDrill + '⚡.' : 'Нужен 🛠 бур (6 осколков).'));
+  else if (cell.monster) { const m = cell.monster; out.push((m.kind === 'guard' ? '👹 Сторож комнаты' : '! Агрессивный монстр') + ', сила ' + m.power + '. Шанс победы ' + Math.round(winChance(m) * 100) + '%, бой ' + cfg.cFight + '⚡.' + (m.kind === 'aggro' ? ' Опасная зона — 8 клеток вокруг.' : ' За ним — комната с богатыми жилами.')); }
+  else if (cell.vein && cell.vein.left > 0) { const v = cell.vein, t = TIERS[v.tier]; out.push('💎 ' + cap1(t.name) + ' жила, ' + (v.left < v.size ? v.left : '~' + v.est) + ' кристаллов по ' + t.value + ' п. Добыча ' + cfg.cMine + '⚡ за штуку.'); }
+  else if (cell.dug) out.push((cell.room ? 'Пещера комнаты' : 'Туннель') + '. Шаг ' + stepCost() + '⚡.');
+  else out.push((cell.hard ? 'Твёрдая порода — копать ' + cfg.cHard : 'Мягкая порода — копать ' + cfg.cSoft) + '⚡.');
+  if (cell.shard) out.push('◆ Осколок: ' + TIERS_NAME(cell.shard) + '.');
+  const a = !cell.monster && aggroNear(c, r);
+  if (a) out.push('⚠ Опасная зона монстра (сила ' + a.m.power + '): шагнёшь — засада.');
+  if (d > 1) out.push('Далеко — ходи по одной клетке.');
+  return out.join(' ');
+}
+function sheetAction(a, v) {
+  const t = sel;
+  if (a === 'mine1' || a === 'mineAll') { doMine(t.c, t.r, a === 'mineAll'); renderSheet(); return; }
+  if (a === 'fight') { closeSheet(); doFight(t.c, t.r); return; }
+  if (a === 'go') { closeSheet(); doMove(t.c, t.r); return; }
+  if (a === 'help') { helpConfirm(); return; }
+  if (a === 'sleep') { closeSheet(); passTime(S.evacuated ? 24 : +v); return; }
+  if (a === 'full') { closeSheet(); passTime(Math.max(0.25, (cfg.eMax - S.energy) / regenPerHour() / (injured() ? cfg.injuryRegen : 1))); return; }
+  if (a === 'cancel' && sheetKind === 'help') { setHelp(false); return; }
+  closeSheet();
+}
+$('sheetBody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b || b.disabled) return;
+  const now = performance.now();
+  if (b.dataset.guard) { if (now - sheetOpenedAt < GUARD_MS || now - lastGuardAct < GUARD_MS) return; lastGuardAct = now; }
+  sheetAction(b.dataset.act, b.dataset.v);
+});
+$('sheetX').onclick = () => { if (helpMode) setHelp(false); closeSheet(); };
+
+// ---------- тап по карте ----------
+function onTap(c, r) {
+  if (!S) return;
+  if (helpMode) { tapHelp(c, r); return; }
+  if (inspectMode) { setInspect(false); inspectAt(c, r); return; }
+  if (!canAct()) { say(S.skipping ? 'Время идёт…' : S.evacuated ? 'Ты наверху. Промотай время ☾ до взрыва.' : S.moving ? 'Муравей идёт…' : ''); return; }
+  const dc = c - S.ant[0], dr = r - S.ant[1];
+  if (!dc && !dr) { say('Тапни соседнюю клетку — шаг или копание. Долгое нажатие — что в клетке.'); return; }
+  if (Math.abs(dc) + Math.abs(dr) !== 1) {
+    flash = { c, r, t0: performance.now() };
+    say('Ходи по одной клетке рядом с муравьём. Наверх — удерживай «⬆ Наверх». Долгое нажатие — что там.');
+    return;
+  }
+  tapNeighbor(c, r, false);
+}
+// тап (или стрелка) по соседней клетке: шаг/копание сразу; бой и засада — через подтверждение
+function tapNeighbor(c, r, repeat) {
+  const k = classify(c, r), kind = selKindFor(k), now = performance.now();
+  if (sel && sel.c === c && sel.r === r && sel.kind === kind && (kind === 'fight' || kind === 'ambush' || kind === 'vein')) {
+    if (repeat || now - sel.t <= CONFIRM_MS) return; // слишком быстро — не считаем вторым тапом
+    if (kind === 'fight') { closeSheet(); doFight(c, r); }
+    else if (kind === 'ambush') { closeSheet(); doMove(c, r); }
+    else { doMine(c, r, false); renderSheet(); }
+    return;
+  }
+  if (k.kind === 'blocked') { closeSheet(); say(k.why); return; }
+  if (kind === 'fight' || kind === 'vein' || kind === 'ambush') { if (!repeat) select(c, r, kind); return; }
+  closeSheet(); doMove(c, r);
+}
+function tapHelp(c, r) {
+  if (!inb(c, r) || r < 1) { say('Выбери скрытую клетку на поле.'); return; }
+  if (S.grid[r][c].seen) { say('Эта клетка уже открыта — выбери тёмную, скрытую.'); return; }
+  if (sel && sel.kind === 'help' && sel.c === c && sel.r === r) { if (performance.now() - sel.t > CONFIRM_MS) helpConfirm(); return; }
+  select(c, r, 'help');
+}
+function helpConfirm() { if (!sel || sel.kind !== 'help') return; const { c, r } = sel; closeSheet(); helpAt(c, r); setHelp(false); }
+function inspectAt(c, r) { select(c, r, 'info'); }
+
+function cellAtPoint(x, y) {
+  const rect = cv.getBoundingClientRect(), p = cp();
+  return [Math.floor((x - rect.left) / p + camX), Math.floor((y - rect.top) / p + camY)];
+}
+// жесты: тап, долгое нажатие (осмотр), свайп (камера), щипок (зум)
+const ptrs = new Map();
+let gest = null;
+cv.addEventListener('pointerdown', e => {
+  lastPtrType = e.pointerType;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1) {
+    gest = { mode: 'tap', x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY };
+    gest.timer = setTimeout(() => { if (gest && gest.mode === 'tap') { gest.mode = 'done'; vib(12); inspectAt(...cellAtPoint(gest.x0, gest.y0)); } }, LONG_MS);
+  } else if (ptrs.size === 2) {
+    if (gest) clearTimeout(gest.timer);
+    const [a, b] = [...ptrs.values()];
+    gest = { mode: 'pinch', d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z0: zoomCols };
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerType === 'mouse' && !ptrs.size) { hoverCell = cellAtPoint(e.clientX, e.clientY); return; }
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (!gest) return;
+  if (gest.mode === 'tap' && Math.hypot(e.clientX - gest.x0, e.clientY - gest.y0) >= MOVE_PX) { clearTimeout(gest.timer); gest.mode = 'pan'; }
+  if (gest.mode === 'pan') { const p = cp(); follow = false; camX -= (e.clientX - gest.lx) / p; camY -= (e.clientY - gest.ly) / p; }
+  if (gest.mode === 'pinch' && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, rect = cv.getBoundingClientRect();
+    const old = cp(); zoomCols = zoomTarget = Math.max(ZMIN, Math.min(ZMAX, gest.z0 * gest.d0 / d));
+    if (!follow) zoomAround((a[0] + b[0]) / 2 - rect.left, (a[1] + b[1]) / 2 - rect.top, old);
+  }
+  gest.lx = e.clientX; gest.ly = e.clientY;
+});
+function endPtr(e, cancel) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (!gest) return;
+  clearTimeout(gest.timer);
+  if (gest.mode === 'tap' && !cancel) onTap(...cellAtPoint(e.clientX, e.clientY));
+  if (gest.mode === 'pinch' && ptrs.size === 1) { const [q] = [...ptrs.values()]; gest = { mode: 'pan', lx: q[0], ly: q[1] }; return; }
+  if (!ptrs.size) gest = null;
+}
+cv.addEventListener('pointerup', e => endPtr(e, false));
+cv.addEventListener('pointercancel', e => endPtr(e, true));
+cv.addEventListener('pointerleave', () => { hoverCell = null; });
+cv.addEventListener('contextmenu', e => { e.preventDefault(); if (lastPtrType === 'mouse') inspectAt(...cellAtPoint(e.clientX, e.clientY)); });
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomTarget = Math.max(ZMIN, Math.min(ZMAX, zoomTarget * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); }, { passive: false });
+
+// ---------- кнопки ----------
+$('bZoom').onclick = () => { zoomTarget = zoomCols < (NEAR + FAR) / 2 ? FAR : NEAR; };
+$('bCenter').onclick = () => { follow = true; };
+$('bHelp').onclick = () => { closeSheet(); setHelp(!helpMode); if (helpMode) say('🤝 Выбери скрытую (тёмную) клетку — друг откроет 3×3 вокруг неё. Можно двигать камеру и зум.'); };
+$('bInspect').onclick = () => { closeSheet(); setInspect(!inspectMode); if (inspectMode) say('Тапни клетку — покажу, что там.'); };
+$('bSleep').onclick = () => { setHelp(false); setInspect(false); if (sheetKind === 'sleep') closeSheet(); else { sel = null; openSheet('sleep'); } };
+$('bEnergy').onclick = () => { if (sheetKind === 'energy') closeSheet(); else { sel = null; openSheet('energy'); } };
+$('bMenu').onclick = () => { $('side').classList.add('open'); $('side').scrollTop = 0; };
+$('menuX').onclick = () => $('side').classList.remove('open');
+// «⬆ Наверх»: удержание ~0,6 с, кольцо заполняется
+const bE = $('bEvac');
+function setRing(p) { $('ring').style.setProperty('--p', p); }
+bE.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!canAct()) { say(S.evacuated ? 'Ты уже наверху.' : 'Сейчас нельзя.'); return; }
+  const info = evacInfo();
+  if (!info.path) { say('Путь наверх перекрыт опасной зоной. Обойди её новым туннелем или победи монстра.'); return; }
+  if (info.total > 0 && info.n < 1) { say('Нет энергии даже на одну клетку подъёма. Поспи ☾.'); return; }
+  hold = { t0: performance.now(), id: e.pointerId };
+  try { bE.setPointerCapture(e.pointerId); } catch (err) {}
+  bE.classList.add('holding');
+});
+function endHold(e) {
+  if (!hold || (e && e.pointerId !== hold.id)) return;
+  const p = (performance.now() - hold.t0) / HOLD_MS;
+  hold = null; bE.classList.remove('holding'); setRing(0);
+  if (p < 1) say('Удерживай «⬆ Наверх», пока не заполнится кольцо (~0,6 с).');
+}
+bE.addEventListener('pointerup', endHold);
+bE.addEventListener('pointercancel', endHold);
+bE.addEventListener('contextmenu', e => e.preventDefault());
+function tickHold() {
+  if (!hold) return;
+  const p = (performance.now() - hold.t0) / HOLD_MS;
+  setRing(Math.min(1, p));
+  if (p >= 1) { hold = null; bE.classList.remove('holding'); setRing(0); vib(20); startClimb(); }
+}
+
+// ---------- размер под экран ----------
+function fitCanvas() {
+  const mobile = window.matchMedia('(max-width: 760px)').matches, head = document.querySelector('header').offsetHeight || 34;
+  document.documentElement.style.setProperty('--head-h', head + 'px');
+  $('game').style.height = mobile ? '' : Math.max(520, Math.min(820, window.innerHeight - head - 26)) + 'px';
+  const rect = $('view').getBoundingClientRect();
+  vw = Math.max(200, rect.width); vh = Math.max(200, rect.height); dpr = Math.min(3, window.devicePixelRatio || 1);
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
 }
 window.addEventListener('resize', fitCanvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', fitCanvas);
+
+// клавиатура (десктоп): стрелки — шаг, Enter — подтвердить, Esc — отмена
 window.addEventListener('keydown', e => {
+  if ($('modal').style.display === 'flex') return;
   const m = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'up' };
-  if (m[e.key]) { doStep(m[e.key]); e.preventDefault(); }
-  if ('mMьЬ'.includes(e.key)) toggleMine();
+  if (m[e.key]) {
+    e.preventDefault();
+    if (helpMode || inspectMode) { say('Сначала выйди из режима (Esc).'); return; }
+    if (!canAct()) return;
+    const [dc, dr] = DIRS[m[e.key]];
+    tapNeighbor(S.ant[0] + dc, S.ant[1] + dr, e.repeat);
+    return;
+  }
+  if (e.key === 'Escape') { setHelp(false); setInspect(false); closeSheet(); $('side').classList.remove('open'); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && sel && !e.repeat) {
+    e.preventDefault();
+    if (sel.kind === 'help') { if (performance.now() - sel.t > CONFIRM_MS) helpConfirm(); }
+    else if (sel.kind === 'fight' || sel.kind === 'ambush' || sel.kind === 'vein') tapNeighbor(sel.c, sel.r, false);
+    else closeSheet();
+  }
 });
 
-function frame() { draw(); updateUI(); requestAnimationFrame(frame); }
-newSeason(); renderStats(); fitCanvas(); setTimeout(fitCanvas, 300); requestAnimationFrame(frame);
+function frame() { dirty(); tickHold(); draw(); updateUI(); requestAnimationFrame(frame); }
+fitCanvas(); newSeason(); renderStats(); setTimeout(fitCanvas, 300); requestAnimationFrame(frame);
 </script>
 </body>
 </html>
