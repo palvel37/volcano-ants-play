@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Спайк рендера</title>
+<script>window.__tOpen = performance.now();</script>
+<style>
+  :root { --bg:#120c0a; --panel:#1d1512; --chip:#2b201b; --chip-on:#d9822b; --text:#f1e6dc; --dim:#a8968a; --ok:#7bd17b; --warn:#f0b04a; --bad:#ff6b5b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font:13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; height:100dvh; }
+  #top { height:40px; flex:none; display:flex; align-items:center; gap:8px; padding:0 10px; background:var(--panel); border-bottom:1px solid #000; }
+  #top b { font-size:14px; }
+  #mode { margin-left:auto; padding:3px 8px; border-radius:10px; font-size:11px; font-weight:700; background:#333; }
+  #mode.act { background:#8a3d12; } #mode.idle { background:#2e3b52; }
+  #field { flex:1; position:relative; overflow:hidden; touch-action:none; }
+  #field canvas { position:absolute; left:0; top:0; display:block; }
+  #stats { position:absolute; left:4px; top:4px; padding:4px 6px; background:rgba(0,0,0,.66); border-radius:6px; font:10.5px/1.32 ui-monospace,Menlo,Consolas,monospace; white-space:pre; pointer-events:auto; max-width:calc(100% - 8px); overflow:hidden; }
+  #stats.small { height:16px; }
+  #banner { position:absolute; left:0; right:0; bottom:8px; text-align:center; pointer-events:none; }
+  #banner span { display:inline-block; background:rgba(0,0,0,.75); padding:4px 10px; border-radius:10px; font-weight:700; }
+  #panel { flex:none; background:var(--panel); border-top:1px solid #000; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:5px; }
+  .row { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow-x:auto; }
+  .row label { width:62px; flex:none; color:var(--dim); font-size:11.5px; }
+  .chip { flex:none; border:0; border-radius:8px; padding:6px 9px; background:var(--chip); color:var(--text); font:600 12px system-ui,sans-serif; }
+  .chip.on { background:var(--chip-on); color:#1a0f08; }
+  #autotest { margin-top:2px; border:0; border-radius:10px; padding:11px; background:#e8a13a; color:#1a0f08; font:800 15px system-ui,sans-serif; }
+  #autotest:disabled { background:#5a4a3a; color:#cbb; }
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.82); display:none; flex-direction:column; padding:12px; gap:8px; z-index:10; }
+  #modal.show { display:flex; }
+  #modal textarea { flex:1; width:100%; background:#0d0907; color:var(--text); border:1px solid #3a2a22; border-radius:8px; font:11px/1.35 ui-monospace,Menlo,Consolas,monospace; padding:8px; resize:none; }
+  #modal .btns { display:flex; gap:8px; } #modal .btns button { flex:1; padding:11px; border:0; border-radius:10px; font:700 14px system-ui,sans-serif; background:var(--chip); color:var(--text); }
+  #modal .btns button.main { background:#e8a13a; color:#1a0f08; }
+  #err { position:fixed; left:8px; right:8px; top:48px; background:#5b1010; color:#fff; padding:8px; border-radius:8px; display:none; font-size:12px; white-space:pre-wrap; z-index:20; }
+</style>
+</head>
+<body>
+<div id="top"><b>Спайк рендера</b><span style="color:var(--dim);font-size:11px">PixiJS 8.22 · §8</span><span id="mode">…</span></div>
+<div id="field"><div id="stats">загрузка…</div><div id="banner"></div></div>
+<div id="panel">
+  <div class="row"><label>Качество</label><button class="chip" data-k="quality" data-v="high">Высокое</button><button class="chip" data-k="quality" data-v="low">Низкое</button>
+    <span style="width:8px"></span><button class="chip" data-k="zoom" data-v="9">9 клеток</button><button class="chip" data-k="zoom" data-v="13">13 клеток</button></div>
+  <div class="row"><label>Частицы</label><button class="chip" data-k="particles" data-v="0">0</button><button class="chip" data-k="particles" data-v="60">60</button><button class="chip" data-k="particles" data-v="150">150</button><button class="chip" data-k="particles" data-v="300">300</button></div>
+  <div class="row"><label>Рендер</label><button class="chip" data-k="res" data-v="auto">авто</button><button class="chip" data-k="res" data-v="1">1×</button><button class="chip" data-k="res" data-v="1.5">1.5×</button><button class="chip" data-k="res" data-v="2">2×</button></div>
+  <div class="row"><label>Слои</label><button class="chip" data-k="fog" data-v="toggle">Туман</button><button class="chip" data-k="vignette" data-v="toggle">Виньетка</button>
+    <span style="width:8px"></span><button class="chip" data-k="scene" data-v="idle">Покой</button><button class="chip" data-k="scene" data-v="action">Действие</button></div>
+  <button id="autotest">▶ Автотест 30 с</button>
+</div>
+<div id="modal"><b>Сводка автотеста — сделайте скриншот или скопируйте</b><textarea id="summary" readonly></textarea>
+  <div class="btns"><button class="main" id="copy">Скопировать</button><button id="close">Закрыть</button></div></div>
+<div id="err"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.js"></script>
+<script>
+'use strict';
+// ============================================================================
+// Спайк рендера Volcano Ants. Прототип: выбросить после замеров (см. README.md).
+// ============================================================================
+const PIXI_URL = 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.js';
+const A = 'render-assets/';
+const P = window.PIXI;
+const $ = (s) => document.querySelector(s);
+const showErr = (m) => { const e = $('#err'); e.style.display = 'block'; e.textContent += m + '\n'; };
+window.addEventListener('error', (e) => showErr('Ошибка: ' + e.message));
+window.addEventListener('unhandledrejection', (e) => showErr('Ошибка: ' + (e.reason && e.reason.message || e.reason)));
+
+const DPR = window.devicePixelRatio || 1;
+const CELL = 48;                // клетка в «точках» мира (= 96 px атласа при resolution 2)
+const W = 40, H = 200;          // поле 40×200 клеток, как в арт-библии §8.2
+const S = { quality: 'high', zoom: 13, particles: 150, res: 'auto', fog: true, vignette: true, scene: 'action' };
+
+// Детерминированный ГПСЧ — чтобы прогоны автотеста были одинаковыми (только для прототипа).
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let rand = mulberry32(7);
+const ri = (a, b) => a + Math.floor(rand() * (b - a + 1));
+
+// ---------------------------------------------------------------- метрики
+const M = {
+  load: {}, decode: {}, gpuProbe: null,
+  intervals: [], cpu: [], times: [],   // кольцо за последние ~10 с
+  drawCalls: 0, lastDrawCalls: 0, sprites: 0, overdraw: 0,
+  phase: null,
+};
+function pushFrame(now, dt, cpu) {
+  M.times.push(now); M.intervals.push(dt); M.cpu.push(cpu);
+  while (M.times.length && now - M.times[0] > 10000) { M.times.shift(); M.intervals.shift(); M.cpu.shift(); }
+  if (M.phase && M.phase.collect && now > M.phase.warmUntil) { M.phase.iv.push(dt); M.phase.cpu.push(cpu); M.phase.dc.push(M.lastDrawCalls); }
+}
+const pct = (arr, p) => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
+const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+function fpsStats(iv) {
+  if (!iv.length) return { avg: 0, low1: 0 };
+  return { avg: 1000 / avg(iv), low1: 1000 / pct(iv, 0.99) };
+}
+
+// ---------------------------------------------------------------- приложение
+let app, gl, renderer;
+const L = {}; // слои
+const TX = { high: {}, low: {} }; // текстуры по имени кадра
+const SRC = { high: [], low: [] }; // источники (для памяти)
+let atlasMeta;
+
+async function fetchBitmap(file, res) {
+  const t0 = performance.now();
+  const r = await fetch(A + file);
+  if (!r.ok) throw new Error('не загрузился ' + file);
+  const blob = await r.blob();
+  const t1 = performance.now();
+  const bmp = await createImageBitmap(blob);
+  const t2 = performance.now();
+  const source = new P.ImageSource({ resource: bmp, resolution: res, scaleMode: 'linear' });
+  return { source, bytes: blob.size, fetchMs: t1 - t0, decodeMs: t2 - t1, w: bmp.width, h: bmp.height };
+}
+
+async function loadSet(set) {
+  const res = set === 'high' ? 2 : 1;
+  const suffix = set === 'high' ? '@2x' : '@1x';
+  const pages = Object.keys(atlasMeta).filter((k) => k[0] !== '_');
+  const t0 = performance.now();
+  const loaded = await Promise.all(pages.map((p) => fetchBitmap(`atlas_${p}${suffix}.webp`, res)));
+  let bytes = 0, decodeMax = 0;
+  pages.forEach((p, i) => {
+    const { source } = loaded[i];
+    bytes += loaded[i].bytes; decodeMax = Math.max(decodeMax, loaded[i].decodeMs);
+    SRC[set].push({ name: p, px: loaded[i].w * loaded[i].h, source });
+    for (const [name, f] of Object.entries(atlasMeta[p].frames)) {
+      TX[set][name] = new P.Texture({ source, frame: new P.Rectangle(f[0] / 2, f[1] / 2, f[2] / 2, f[3] / 2) });
+    }
+  });
+  return { ms: performance.now() - t0, bytes, decodeMax };
+}
+const tex = (name) => TX[S.quality === 'low' && TX.low[name] ? 'low' : 'high'][name];
+
+async function boot() {
+  const pixiRes = performance.getEntriesByName(PIXI_URL)[0];
+  M.load.pixiMs = pixiRes ? pixiRes.duration : null;
+  M.load.pixiKB = pixiRes && pixiRes.transferSize ? pixiRes.transferSize / 1024 : null;
+  M.load.pixiEnd = pixiRes ? pixiRes.responseEnd : null;
+
+  const field = $('#field');
+  app = new P.Application();
+  await app.init({
+    width: field.clientWidth, height: field.clientHeight, resolution: currentRes(), autoDensity: true,
+    preference: 'webgl', antialias: false, background: '#120c0a', backgroundAlpha: 1,
+    autoStart: false, sharedTicker: false, powerPreference: 'high-performance',
+  });
+  app.ticker.stop();
+  field.prepend(app.canvas);
+  renderer = app.renderer;
+  gl = renderer.gl;
+  hookDrawCalls();
+
+  const tA = performance.now();
+  atlasMeta = await (await fetch(A + 'atlas.json')).json();
+  const env = await Promise.all(['env_lava_surface@2x.webp', 'env_lava_glow@2x.webp', 'env_vignette@2x.webp'].map((f) => fetchBitmap(f, 2)));
+  const hi = await loadSet('high');
+  env.forEach((e, i) => { SRC.high.push({ name: 'env' + i, px: e.w * e.h, source: e.source }); });
+  TX.env = env.map((e) => new P.Texture({ source: e.source }));
+  M.load.atlasMs = performance.now() - tA;
+  M.load.atlasKB = (hi.bytes + env.reduce((a, e) => a + e.bytes, 0)) / 1024;
+  M.load.decodeMax = hi.decodeMax;
+
+  buildMap();
+  buildScene();
+  resize();
+  window.addEventListener('resize', () => { resize(); });
+  setupInput();
+  setupUI();
+  requestAnimationFrame(frame);
+}
+
+// --------------------------------------------- подсчёт вызовов отрисовки
+function hookDrawCalls() {
+  for (const fn of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced']) {
+    const orig = gl[fn];
+    if (typeof orig !== 'function') continue;
+    gl[fn] = function () { M.drawCalls++; return orig.apply(this, arguments); };
+  }
+}
+function glInfo() {
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  return {
+    webgl: (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext) ? 2 : 1,
+    gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+    units: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+    maxTex: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+    batchable: renderer.limits ? renderer.limits.maxBatchableTextures : '?',
+    timerExt: !!(gl.getExtension('EXT_disjoint_timer_query_webgl2') || gl.getExtension('EXT_disjoint_timer_query')),
+  };
+}
+
+// ---------------------------------------------------------------- карта
+const T = { SOFT: 0, HARD: 1, TUN: 2, IRON: 3, WALL: 4, FLOOR: 5 };
+const grid = new Uint8Array(W * H), vari = new Uint8Array(W * H), cryst = new Int8Array(W * H).fill(-1);
+const fogState = new Uint8Array(W * H); // 0 неизвестно, 1 разведано, 2 видно
+const zones = []; let route = [];
+const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? T.HARD : grid[y * W + x];
+const COLORS = ['red', 'blue', 'purple', 'yellow'], SIZES = ['small', 'mid', 'big'];
+
+function buildMap() {
+  rand = mulberry32(7);
+  for (let i = 0; i < W * H; i++) { grid[i] = rand() < 0.28 ? T.HARD : T.SOFT; vari[i] = ri(0, 255); }
+  for (let y = 10; y < H; y += ri(11, 15)) {      // перегородки из железа с проходами
+    const gap = ri(3, W - 6);
+    for (let x = 0; x < W; x++) if (x < gap || x > gap + 3) grid[y * W + x] = T.IRON;
+  }
+  for (let k = 0; k < 26; k++) {                   // комнаты
+    const rx = ri(1, W - 8), ry = ri(4, H - 8), rw = ri(5, 7), rh = ri(4, 5);
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++)
+      grid[y * W + x] = (x === rx || y === ry || x === rx + rw - 1 || y === ry + rh - 1) ? T.WALL : T.FLOOR;
+  }
+  for (let k = 0; k < 30; k++) {                   // старые туннели
+    let x = ri(0, W - 1), y = ri(0, H - 1);
+    for (let s = 0; s < 30; s++) { if (grid[y * W + x] <= T.HARD) grid[y * W + x] = T.TUN; if (rand() < 0.5) x = Math.max(0, Math.min(W - 1, x + (rand() < 0.5 ? -1 : 1))); else y = Math.max(0, Math.min(H - 1, y + 1)); }
+  }
+  for (let i = 0; i < W * H; i++) if (grid[i] <= T.HARD && rand() < 0.07) cryst[i] = ri(0, 3) * 3 + (rand() < 0.6 ? 0 : rand() < 0.7 ? 1 : 2);
+  for (let y = 6; y < H - 4; y += ri(9, 14)) zones.push({ x: ri(1, W - 5), y, w: 3, h: 3 });
+  // маршрут муравья: вниз, обходя железо и стены
+  route = []; let x = 20, y = 1; route.push([x, y]);
+  let dir = 1;
+  while (y < H - 3 && route.length < 2000) {
+    const down = at(x, y + 1);
+    if (down !== T.IRON && down !== T.WALL && rand() < 0.75) y++;
+    else { if (at(x + dir, y) === T.IRON || at(x + dir, y) === T.WALL || x + dir < 1 || x + dir > W - 2) dir = -dir; x += dir; }
+    route.push([x, y]);
+  }
+  // туман: всё неизвестно, кое-где разведано
+  fogState.fill(0);
+  for (const [rx, ry] of route) for (let yy = ry - 4; yy <= ry + 4; yy++) for (let xx = rx - 4; xx <= rx + 4; xx++) if (xx >= 0 && yy >= 0 && xx < W && yy < H && rand() < 0.8) fogState[yy * W + xx] = 1; // муравей «уже ходил» рядом
+  for (let k = 0; k < 40; k++) { const cx = ri(0, W - 1), cy = ri(0, H - 1), r = ri(2, 4); for (let yy = cy - r; yy <= cy + r; yy++) for (let xx = cx - r; xx <= cx + r; xx++) if (xx >= 0 && yy >= 0 && xx < W && yy < H) fogState[yy * W + xx] = 1; }
+}
+
+function tileName(x, y) {
+  const t = at(x, y), v = vari[y * W + x];
+  switch (t) {
+    case T.SOFT: return 'tile_rock_soft_' + String(v % 24).padStart(2, '0');
+    case T.HARD: return 'tile_rock_hard_' + String(v % 16).padStart(2, '0');
+    case T.TUN: return 'tile_tunnel_' + String(v % 12).padStart(2, '0');
+    case T.IRON: return 'tile_iron_' + String(v % 12).padStart(2, '0');
+    case T.WALL: { const m = (at(x, y - 1) === T.FLOOR ? 1 : 0) | (at(x + 1, y) === T.FLOOR ? 2 : 0) | (at(x, y + 1) === T.FLOOR ? 4 : 0) | (at(x - 1, y) === T.FLOOR ? 8 : 0); return 'tile_room_wall_' + String(m).padStart(2, '0'); }
+    default: return 'tile_room_floor_' + String(v % 8).padStart(2, '0');
+  }
+}
+function depthTint(y) { // затемнение по глубине через tint (§8.9)
+  const k = Math.min(1, y / H) * 0.45;
+  const r = Math.round(255 * (1 - k)), g = Math.round(255 * (1 - k * 1.25)), b = Math.round(255 * (1 - k * 1.35));
+  return (r << 16) | (g << 8) | b;
+}
+
+// ---------------------------------------------------------------- сцена
+let cellCss = 30, cols = 13, rows = 22;
+const cam = { x: 0, y: 0, dragUntil: 0 };
+const pool = { tiles: [], crystals: [], halos: [], danger: [] };
+let ant, antLamp, monsters = [], fogCanvas, fogCtx, fogTex, fogSprite, fogImg;
+let lavaGlow, lava, vignette;
+let addPC, normPC; const parts = { add: [], norm: [] };
+
+function buildScene() {
+  const st = app.stage;
+  L.world = new P.Container(); st.addChild(L.world);
+  L.tiles = new P.Container(); L.items = new P.Container(); L.chars = new P.Container();
+  normPC = new P.ParticleContainer({ dynamicProperties: { position: true, rotation: true, vertex: true, color: true, uvs: true } });
+  L.add = new P.Container(); L.add.blendMode = 'add';
+  addPC = new P.ParticleContainer({ dynamicProperties: { position: true, rotation: true, vertex: true, color: true, uvs: true } });
+  addPC.blendMode = 'add';
+  L.world.addChild(L.tiles, L.items, L.chars, normPC, L.add);
+  L.halos = new P.Container(); L.add.addChild(L.halos); L.add.addChild(addPC);
+
+  // туман: 1 пиксель = 1 клетка (§8.9)
+  fogCanvas = document.createElement('canvas'); fogCanvas.width = W; fogCanvas.height = H;
+  fogCtx = fogCanvas.getContext('2d'); fogImg = fogCtx.createImageData(W, H);
+  fogTex = P.Texture.from(fogCanvas); fogTex.source.scaleMode = 'linear';
+  fogSprite = new P.Sprite(fogTex); fogSprite.width = W * CELL; fogSprite.height = H * CELL;
+  L.world.addChild(fogSprite);
+  redrawFog();
+
+  // муравей и монстры
+  ant = { s: new P.Sprite(tex('hero_idle_00')), x: route[0][0], y: route[0][1], idx: 0, state: 'walk', t: 0, dir: 1, frameT: 0, hurt: 0 };
+  ant.s.anchor.set(0.5, 0.97); L.chars.addChild(ant.s);
+  revealAround(ant.x, ant.y);
+  antLamp = new P.Sprite(tex('fx_lamp_cone')); antLamp.anchor.set(0.15, 0.5); L.add.addChildAt(antLamp, 0);
+  const defs = [['guard', 3, -1, 0.67], ['crawler', -3, 1, 0.75], ['spiker', 2, 3, 0.75], ['biter', -2, -3, 0.75]];
+  monsters = defs.map(([kind, ox, oy, sc], i) => {
+    const s = new P.Sprite(tex(`mon_${kind}_idle_00`)); s.anchor.set(0.5, 0.97); s.scale.set(sc); L.chars.addChild(s);
+    return { kind, s, ox, oy, sc, x: ant.x + ox, y: ant.y + oy, phase: i * 1.7, attackT: 0, frameT: rand() };
+  });
+
+  // экранный слой: свечение лавы (add), поверхность лавы, виньетка
+  L.screen = new P.Container(); st.addChild(L.screen);
+  lavaGlow = new P.Sprite(TX.env[1]); lavaGlow.blendMode = 'add';
+  lava = new P.TilingSprite({ texture: TX.env[0], width: 100, height: 40 });
+  vignette = new P.Sprite(TX.env[2]);
+  L.screen.addChild(lavaGlow, lava, vignette);
+  L.probe = new P.Container(); st.addChild(L.probe); // для замера загрузки текстур в GPU
+}
+
+function currentRes() {
+  if (S.res !== 'auto') return +S.res;
+  return S.quality === 'low' ? Math.min(DPR, 1.5) : Math.min(DPR, 2);
+}
+
+function resize() {
+  const f = $('#field');
+  const w = f.clientWidth, h = f.clientHeight;
+  renderer.resize(w, h, currentRes());
+  cols = S.zoom; cellCss = w / cols; rows = Math.ceil(h / cellCss);
+  L.world.scale.set(cellCss / CELL);
+  const needT = (cols + 2) * (rows + 2);
+  while (pool.tiles.length < needT) { const s = new P.Sprite(tex('tile_rock_soft_00')); L.tiles.addChild(s); pool.tiles.push(s); }
+  pool.tiles.forEach((s, i) => { s.visible = i < needT; });
+  const lavaH = Math.round(cellCss * 1.1);
+  lava.width = w; lava.height = lavaH; lava.y = h - lavaH; lava.tileScale.set(lavaH / 128);
+  lavaGlow.width = w; lavaGlow.height = cellCss * 3; lavaGlow.y = h - lavaH - cellCss * 3 + 4;
+  vignette.width = w; vignette.height = h;
+  lastOrigin = null;
+}
+
+let lastOrigin = null, mapDirty = true;
+function refreshPools() {
+  const ox = Math.floor(cam.x) - 1, oy = Math.floor(cam.y) - 1;
+  const key = ox + ',' + oy + ',' + cols + ',' + S.quality;
+  if (key === lastOrigin && !mapDirty) return;
+  lastOrigin = key; mapDirty = false;
+  const cw = cols + 2, ch = rows + 2;
+  let i = 0, ci = 0, di = 0;
+  for (let y = oy; y < oy + ch; y++) for (let x = ox; x < ox + cw; x++) {
+    const s = pool.tiles[i++];
+    if (x < 0 || y < 0 || x >= W || y >= H) { s.visible = false; continue; }
+    s.visible = true; s.texture = tex(tileName(x, y)); s.position.set(x * CELL, y * CELL); s.width = CELL; s.height = CELL; s.tint = depthTint(y);
+    const c = cryst[y * W + x];
+    if (c >= 0) {
+      if (ci >= pool.crystals.length) {
+        const cs = new P.Sprite(); cs.anchor.set(0.5); L.items.addChild(cs); pool.crystals.push(cs);
+        const hs = new P.Sprite(); hs.anchor.set(0.5); L.halos.addChild(hs); pool.halos.push(hs);
+      }
+      const cs = pool.crystals[ci], hs = pool.halos[ci]; ci++;
+      const col = COLORS[Math.floor(c / 3)], sz = SIZES[c % 3];
+      cs.visible = hs.visible = true;
+      cs.texture = tex(`itm_crystal_${col}_${sz}`); cs.width = cs.height = CELL; cs.position.set(x * CELL + CELL / 2, y * CELL + CELL / 2);
+      hs.texture = tex(`fx_glow_halo_${col}`); hs.width = hs.height = CELL * (1.3 + 0.3 * (c % 3)); hs.position.copyFrom(cs.position); hs.pulse = (x * 7 + y * 13) % 10;
+    }
+  }
+  for (; ci < pool.crystals.length; ci++) pool.crystals[ci].visible = pool.halos[ci].visible = false;
+  // опасные зоны: штриховка + 8 частей рамки + знак
+  for (const z of zones) {
+    if (z.y + z.h < oy || z.y > oy + ch) continue;
+    for (let yy = 0; yy < z.h; yy++) for (let xx = 0; xx < z.w; xx++) {
+      const parts8 = (yy === 0 ? 't' : yy === z.h - 1 ? 'b' : '') + (xx === 0 ? 'l' : xx === z.w - 1 ? 'r' : '');
+      const names = ['fx_danger_hatch']; if (parts8) names.push('fx_danger_frame_' + parts8); else names.push('fx_danger_warn');
+      for (const n of names) {
+        if (di >= pool.danger.length) { const s = new P.Sprite(); L.items.addChild(s); pool.danger.push(s); }
+        const s = pool.danger[di++]; s.visible = true; s.texture = tex(n); s.width = s.height = CELL; s.position.set((z.x + xx) * CELL, (z.y + yy) * CELL);
+      }
+    }
+  }
+  for (; di < pool.danger.length; di++) pool.danger[di].visible = false;
+}
+
+// ---------------------------------------------------------------- туман
+function redrawFog() {
+  const d = fogImg.data;
+  for (let i = 0; i < W * H; i++) { const s = fogState[i]; d[i * 4] = 14; d[i * 4 + 1] = 9; d[i * 4 + 2] = 8; d[i * 4 + 3] = s === 0 ? 255 : s === 1 ? 140 : 0; }
+  fogCtx.putImageData(fogImg, 0, 0);
+  fogTex.source.update();
+}
+function revealAround(cx, cy) {
+  for (let i = 0; i < W * H; i++) if (fogState[i] === 2) fogState[i] = 1;
+  for (let y = cy - 3; y <= cy + 3; y++) for (let x = cx - 3; x <= cx + 3; x++) {
+    if (x < 0 || y < 0 || x >= W || y >= H) continue;
+    if ((x - cx) ** 2 + (y - cy) ** 2 <= 7.5) fogState[y * W + x] = 2;
+  }
+  redrawFog();
+}
+
+// ---------------------------------------------------------------- частицы
+const PTEX = { spark: ['fx_spark_00', 'fx_spark_01', 'fx_spark_02', 'fx_spark_03'], ash: ['fx_ash_00', 'fx_ash_01', 'fx_ash_02', 'fx_ash_03'], chip: ['fx_chip_00', 'fx_chip_01', 'fx_chip_02', 'fx_chip_03'] };
+let particlesDirty = false;
+function maxParticles() { return S.quality === 'low' ? Math.min(60, S.particles) : S.particles; }
+function liveCount() { return parts.add.length + parts.norm.length; }
+function spawn(kind, x, y, vx, vy, life, size) {
+  if (liveCount() >= maxParticles()) return;
+  const names = PTEX[kind];
+  const p = new P.Particle({ texture: tex(names[Math.floor(rand() * names.length)]), x, y, anchorX: 0.5, anchorY: 0.5 });
+  const t = p.texture; const sc = size / t.width; p.scaleX = p.scaleY = sc;
+  p.vx = vx; p.vy = vy; p.life = p.max = life; p.kind = kind; p.g = kind === 'chip' ? 260 : kind === 'spark' ? 120 : -6;
+  (kind === 'spark' ? parts.add : parts.norm).push(p); particlesDirty = true;
+}
+function burst(kind, x, y, n, speed, size) { for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2, v = speed * (0.4 + rand() * 0.6); spawn(kind, x, y, Math.cos(a) * v, Math.sin(a) * v - speed * 0.3, 0.4 + rand() * 0.5, size * (0.7 + rand() * 0.6)); } }
+function updateParticles(dt) {
+  for (const list of [parts.add, parts.norm]) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i]; p.life -= dt;
+      if (p.life <= 0) { list.splice(i, 1); particlesDirty = true; continue; }
+      p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rotation += dt * 2;
+      p.alpha = Math.min(1, p.life / p.max * 1.5);
+    }
+  }
+  // фон: угольки над лавой (только «Высокое», ≤ 40) и пепел — добиваем до лимита
+  const viewTop = cam.y * CELL, viewH = rows * CELL, viewL = cam.x * CELL, viewW = cols * CELL;
+  const emberCount = parts.add.filter((p) => p.kind === 'ember').length;
+  let guard = 0;
+  while (liveCount() < maxParticles() && guard++ < 20) {
+    if (S.quality === 'high' && emberCount + guard < 40 && rand() < 0.5) {
+      spawn('spark', viewL + rand() * viewW, viewTop + viewH - CELL * 0.8, (rand() - 0.5) * 20, -30 - rand() * 50, 2 + rand() * 2, 5 + rand() * 5);
+      const last = parts.add[parts.add.length - 1]; if (last) { last.kind = 'ember'; last.g = -4; }
+    } else {
+      spawn('ash', viewL + rand() * viewW, viewTop + rand() * viewH, (rand() - 0.5) * 12, 6 + rand() * 12, 3 + rand() * 3, 5 + rand() * 6);
+    }
+  }
+  if (particlesDirty) { addPC.particleChildren = parts.add; normPC.particleChildren = parts.norm; addPC.update(); normPC.update(); particlesDirty = false; }
+}
+
+// ---------------------------------------------------------------- логика сцены
+let time = 0, lastActivity = -1e9, speedMul = 1, routeDir = 1, antStepEvents = 0;
+function touch() { lastActivity = performance.now(); }
+function isAction(now) {
+  if (S.scene === 'action') return true;
+  return now - lastActivity < 1500;
+}
+function setAntFrame(pose, fps) {
+  const n = { idle: 4, walk: 8, dig: 6 }[pose];
+  const f = Math.floor(ant.frameT * fps) % n;
+  ant.s.texture = tex(`hero_${pose}_${String(f).padStart(2, '0')}`);
+  ant.s.scale.set(ant.dir * 0.96, 0.96); // 64×80 точек → ~1.6 клетки (§8.8)
+}
+function updateAnt(dt, acting) {
+  ant.frameT += dt;
+  if (!acting) { setAntFrame('idle', 6); return; }
+  const next = route[ant.idx + routeDir];
+  if (!next) { routeDir = -routeDir; return; }
+  const [nx, ny] = next, cur = route[ant.idx];
+  const t = at(nx, ny);
+  if (ant.state === 'walk' && (t === T.SOFT || t === T.HARD) && ant.t === 0) { ant.state = 'dig'; ant.digT = (t === T.HARD ? 1.0 : 0.6) / speedMul; ant.chipT = 0; }
+  if (ant.state === 'dig') {
+    ant.digT -= dt; ant.chipT -= dt; setAntFrame('dig', 12);
+    ant.dir = nx > cur[0] ? 1 : nx < cur[0] ? -1 : ant.dir;
+    if (ant.chipT <= 0) { ant.chipT = 0.18; burst('chip', (cur[0] + nx + 1) * CELL / 2, (cur[1] + ny + 1) * CELL / 2, 6, 140, 9); }
+    if (ant.digT <= 0) {
+      const i = ny * W + nx;
+      if (cryst[i] >= 0) { burst('spark', nx * CELL + CELL / 2, ny * CELL + CELL / 2, 15, 160, 10); cryst[i] = -1; }
+      grid[i] = T.TUN; mapDirty = true; ant.state = 'walk'; ant.t = 0.0001;
+    }
+    touch();
+    return;
+  }
+  ant.t += dt * speedMul / 0.32;
+  setAntFrame('walk', 14);
+  ant.dir = nx > cur[0] ? 1 : nx < cur[0] ? -1 : ant.dir;
+  ant.x = cur[0] + (nx - cur[0]) * Math.min(1, ant.t); ant.y = cur[1] + (ny - cur[1]) * Math.min(1, ant.t);
+  if (ant.t >= 1) { ant.idx += routeDir; ant.t = 0; antStepEvents++; revealAround(nx, ny); }
+  touch();
+}
+function updateMonsters(dt, acting) {
+  for (const m of monsters) {
+    m.frameT += dt;
+    const wob = Math.sin(time * 0.8 + m.phase);
+    let tx = ant.x + m.ox + wob * 0.6, ty = ant.y + m.oy + Math.cos(time * 0.6 + m.phase) * 0.4;
+    if (m.attackT > 0) {
+      m.attackT -= dt; tx = ant.x + (m.ox > 0 ? 0.9 : -0.9); ty = ant.y;
+      const f = Math.floor((0.8 - m.attackT) * 8) % 4;
+      m.s.texture = tex(`mon_${m.kind}_attack_${String(Math.max(0, f)).padStart(2, '0')}`);
+      if (m.attackT <= 0.4 && !m.hit) { m.hit = true; burst('spark', (ant.x + (m.ox > 0 ? 0.6 : -0.1)) * CELL + CELL / 2, ant.y * CELL + CELL / 2, 25, 200, 10); ant.hurt = 0.15; }
+    } else {
+      const n = m.kind === 'guard' ? 5 : 4;
+      const f = Math.floor(m.frameT * 6) % n;
+      m.s.texture = tex(m.kind === 'guard' ? `mon_guard_idle_${String(Math.min(3, f)).padStart(2, '0')}` : `mon_${m.kind}_idle_${String(f).padStart(2, '0')}`);
+      if (acting && m.kind !== 'guard' && rand() < dt / 4) { m.attackT = 0.8; m.hit = false; }
+    }
+    const k = Math.min(1, dt * (m.attackT > 0 ? 8 : 2));
+    m.x += (tx - m.x) * k; m.y += (ty - m.y) * k;
+    m.s.position.set(m.x * CELL + CELL / 2, (m.y + 1) * CELL + Math.sin(time * 3 + m.phase) * 1.5);
+    m.s.scale.set((ant.x < m.x ? -1 : 1) * m.sc, m.sc);
+  }
+}
+function updateCamera(dt, now) {
+  if (now > cam.dragUntil) {
+    const tx = ant.x + 0.5 - cols / 2, ty = ant.y - rows * 0.42;
+    const k = Math.min(1, dt * 4);
+    cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+  }
+  cam.x = Math.max(0, Math.min(W - cols, cam.x)); cam.y = Math.max(-1, Math.min(H - rows + 1, cam.y));
+  L.world.position.set(-cam.x * cellCss, -cam.y * cellCss); // дробный сдвиг — проверка швов (§8.15 п.6)
+}
+function update(dt, now, acting) {
+  time += dt;
+  updateAnt(dt, acting);
+  ant.s.position.set(ant.x * CELL + CELL / 2, (ant.y + 1) * CELL);
+  if (ant.hurt > 0) { ant.hurt -= dt; ant.s.tint = 0xff8080; } else ant.s.tint = 0xffffff;
+  antLamp.position.set(ant.x * CELL + CELL / 2 + ant.dir * 12, ant.y * CELL + 6);
+  antLamp.scale.set(ant.dir * 0.45, 0.4); antLamp.alpha = 0.5 + Math.sin(time * 9) * 0.05;
+  updateMonsters(dt, acting);
+  updateCamera(dt, now);
+  refreshPools();
+  // пульсы: ореолы кристаллов, опасная зона (~1.2 с), свечение лавы
+  for (const h of pool.halos) if (h.visible) h.alpha = 0.45 + 0.3 * Math.sin(time * 2.2 + h.pulse);
+  const dz = 0.55 + 0.35 * Math.sin(time * Math.PI * 2 / 1.2);
+  for (const d of pool.danger) if (d.visible) d.alpha = dz;
+  lavaGlow.alpha = 0.55 + 0.2 * Math.sin(time * 1.3);
+  lava.tilePosition.x -= dt * 12;
+  fogSprite.visible = S.fog; vignette.visible = S.vignette;
+  updateParticles(dt);
+}
+
+// ---------------------------------------------------------------- кадр
+let lastRender = 0, firstFrame = true, uiT = 0, statT = 0, startT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const acting = isAction(now) && !(autotest && autotest.forceIdle);
+  const target = S.quality === 'low' ? 30 : acting ? 60 : 30; // §8.11 / §8.12
+  if (lastRender && now - lastRender < 800 / target) return; // запас на дрожание rAF (60/90/120 Гц)
+  const dt = lastRender ? Math.min(0.1, (now - lastRender) / 1000) : 1 / 60;
+  const iv = lastRender ? now - lastRender : 16.7;
+  lastRender = now;
+  const c0 = performance.now();
+  if (autotest) autotest.tick(now);
+  update(dt, now, acting);
+  M.drawCalls = 0;
+  renderer.render(app.stage);
+  M.lastDrawCalls = M.drawCalls;
+  const cpu = performance.now() - c0;
+  pushFrame(now, iv, cpu);
+  M.target = target; M.acting = acting;
+  if (firstFrame) { firstFrame = false; M.load.firstFrame = performance.now(); startT = now; setTimeout(afterFirstFrame, 800); }
+  if (now - statT > 500) { statT = now; countSprites(); }
+  if (now - uiT > 250) { uiT = now; drawStats(now); }
+}
+
+function countSprites() {
+  let n = 0, area = 0;
+  const fw = renderer.width, fh = renderer.height, A0 = fw * fh, c2 = cellCss * cellCss;
+  for (const s of pool.tiles) if (s.visible) n++;
+  area += A0; // порода покрывает всё поле
+  for (const s of pool.crystals) if (s.visible) { n++; area += c2; }
+  for (const s of pool.halos) if (s.visible) { n++; area += (s.width * L.world.scale.x) ** 2; }
+  for (const s of pool.danger) if (s.visible) { n++; area += c2; }
+  n += 1 + monsters.length + 1; // муравей, монстры, конус фонаря
+  area += c2 * 1.6 + monsters.length * c2 * 1.2 + c2 * 2;
+  const pc = liveCount(); n += pc; area += pc * (8 * L.world.scale.x) ** 2;
+  if (S.fog) { n++; area += A0; }
+  if (S.vignette) { n++; area += A0; }
+  n += 2; area += fw * (lava.height + lavaGlow.height);
+  M.sprites = n; M.overdraw = area / A0;
+}
+function texMB(set) { return SRC[set].reduce((a, s) => a + s.px * 4, 0) / 1048576; }
+function memInfo() { const m = performance.memory; return m ? { used: m.usedJSHeapSize / 1048576, total: m.totalJSHeapSize / 1048576, limit: m.jsHeapSizeLimit / 1048576 } : null; }
+
+let gi;
+function drawStats(now) {
+  if ($('#stats').classList.contains('small')) { $('#stats').textContent = `▸ FPS ${fpsNow(now)}  DC ${M.lastDrawCalls}  (нажми — подробно)`; return; }
+  gi = gi || glInfo();
+  const iv5 = M.intervals.slice(-Math.max(1, M.times.filter((t) => now - t < 5000).length));
+  const cpu5 = M.cpu.slice(-iv5.length);
+  const f = fpsStats(iv5); const mem = memInfo();
+  const res = currentRes();
+  const lines = [
+    `FPS ${fpsNow(now)} (цель ${M.target})  ср5с ${f.avg.toFixed(1)}  1%low ${f.low1.toFixed(1)}`,
+    `кадр CPU ср ${avg(cpu5).toFixed(2)} мс  p95 ${pct(cpu5, 0.95).toFixed(2)} мс`,
+    `draw calls ${M.lastDrawCalls}   спрайтов ${M.sprites}   частиц ${liveCount()}`,
+    `перерисовка ≈ ${M.overdraw.toFixed(2)}× экрана`,
+    `GPU: ${String(gi.gpu).slice(0, 38)}`,
+    `TEX_UNITS ${gi.units}  батч ${gi.batchable}  MAX_TEX ${gi.maxTex}  WebGL${gi.webgl}`,
+    `DPR ${DPR}  рендер ×${res}  канвас ${app.canvas.width}×${app.canvas.height} px`,
+    `текстуры ${texMB('high').toFixed(1)} МБ${SRC.low.length ? ` +@1x ${texMB('low').toFixed(1)}` : ''}` + (mem ? `  JS ${mem.used.toFixed(0)}/${mem.total.toFixed(0)} МБ` : '  JS-память: н/д'),
+    `атласы ${M.load.atlasKB.toFixed(0)} КБ за ${M.load.atlasMs.toFixed(0)} мс  декод ≤${M.load.decodeMax.toFixed(0)} мс`,
+    M.decode.d2048 ? `WebP 1024² ${M.decode.d1024.dec.toFixed(0)}+GPU ${M.decode.d1024.up.toFixed(0)} мс  2048² ${M.decode.d2048.dec.toFixed(0)}+GPU ${M.decode.d2048.up.toFixed(0)} мс` : 'тест декодирования…',
+  ];
+  if (M.recommendLow != null) lines.push(M.recommendLow ? 'авто-выбор §8.12: → «Низкое» (кадр > 20 мс)' : 'авто-выбор §8.12: «Высокое» ок');
+  $('#stats').textContent = lines.join('\n');
+  const md = $('#mode'); md.textContent = M.acting ? 'ДЕЙСТВИЕ · 60' : 'ПОКОЙ · 30'; if (S.quality === 'low') md.textContent += ' (низк. = 30)'; md.className = M.acting ? 'act' : 'idle';
+}
+function fpsNow(now) { return M.times.filter((t) => now - t < 1000).length; }
+
+// --------------------------------------------- после первого кадра: декодирование, @1x, авто-выбор
+async function afterFirstFrame() {
+  // авто-выбор качества §8.12 по первым 3 с
+  setTimeout(() => { const iv = M.intervals.slice(-90); M.recommendLow = avg(iv) > 20 && M.acting; }, 3000);
+  try { M.decode.d1024 = await decodeTest('atlas_tiles@2x.webp'); M.decode.d2048 = await decodeTest('atlas_decode_test_2048@2x.webp'); }
+  catch (e) { showErr('тест декодирования: ' + e.message); }
+  try { const lo = await loadSet('low'); M.load.lowKB = lo.bytes / 1024; } catch (e) { showErr('@1x: ' + e.message); }
+}
+const syncBuf = new Uint8Array(4);
+function syncRender() { const t0 = performance.now(); renderer.render(app.stage); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, syncBuf); return performance.now() - t0; }
+async function decodeTest(file) {
+  const blob = await (await fetch(A + file)).blob();
+  let t0 = performance.now();
+  const bmp = await createImageBitmap(blob);
+  const dec = performance.now() - t0;
+  const url = URL.createObjectURL(blob); const img = new Image(); img.src = url;
+  t0 = performance.now(); await img.decode(); const decImg = performance.now() - t0; URL.revokeObjectURL(url);
+  const base = syncRender();
+  const source = new P.ImageSource({ resource: bmp, resolution: 1 });
+  const spr = new P.Sprite(new P.Texture({ source })); spr.width = spr.height = 2; spr.alpha = 0.01; L.probe.addChild(spr);
+  const withUp = syncRender();
+  L.probe.removeChild(spr); spr.destroy(); source.destroy(); bmp.close && bmp.close();
+  return { dec, decImg, up: Math.max(0, withUp - base), kb: blob.size / 1024 };
+}
+
+// --------------------------------------------- GPU-проба: туман и виньетка (§8.15 п.3)
+function gpuProbe() {
+  const keep = { fog: S.fog, vig: S.vignette, add: L.add.visible };
+  const cfgs = [['всё', true, true, true], ['без тумана', false, true, true], ['без виньетки', true, false, true], ['без тумана и виньетки', false, false, true], ['без add-слоя', true, true, false]];
+  const out = {};
+  for (const [name, fog, vig, add] of cfgs) {
+    fogSprite.visible = fog; vignette.visible = vig; L.add.visible = add;
+    syncRender(); syncRender();
+    const arr = []; for (let i = 0; i < 20; i++) arr.push(syncRender());
+    out[name] = pct(arr, 0.5);
+  }
+  fogSprite.visible = keep.fog; vignette.visible = keep.vig; L.add.visible = keep.add;
+  return out;
+}
+
+// ---------------------------------------------------------------- автотест 30 с
+let autotest = null;
+const PHASES = [
+  { name: 'покой, 13 клеток', dur: 4, set: { zoom: 13, quality: 'high', particles: 150 }, idle: true },
+  { name: 'действие, 13 кл., скролл вниз', dur: 8, set: { zoom: 13, quality: 'high', particles: 150 }, speed: 3, dir: 1 },
+  { name: 'действие, 9 кл., скролл вверх', dur: 6, set: { zoom: 9, quality: 'high', particles: 150 }, speed: 3, dir: -1 },
+  { name: 'GPU-проба туман/виньетка', dur: 2, set: { zoom: 13, quality: 'high', particles: 150 }, probe: true },
+  { name: 'Низкое, 13 кл., действие', dur: 5, set: { zoom: 13, quality: 'low', particles: 150 }, speed: 3, dir: 1 },
+  { name: 'стресс: 300 частиц, 13 кл.', dur: 5, set: { zoom: 13, quality: 'high', particles: 300 }, speed: 3, dir: 1 },
+];
+function startAutotest() {
+  const saved = { ...S };
+  S.fog = true; S.vignette = true; S.res = 'auto';
+  $('#autotest').disabled = true;
+  const results = [];
+  let pi = -1, phaseEnd = 0;
+  autotest = {
+    forceIdle: false,
+    tick(now) {
+      if (now < phaseEnd) { if (M.phase && !M.phase.def.idle) touch(); return; }
+      if (M.phase && M.phase.collect) results.push(summarizePhase(M.phase));
+      pi++;
+      if (pi >= PHASES.length) { finishAutotest(saved, results); return; }
+      const def = PHASES[pi];
+      const needResize = def.set.zoom !== S.zoom || def.set.quality !== S.quality;
+      Object.assign(S, def.set); if (needResize) applySettings();
+      this.forceIdle = !!def.idle; S.scene = def.idle ? 'idle' : 'action';
+      speedMul = def.speed || 1; if (def.dir) routeDir = def.dir;
+      if (def.probe) { M.gpuProbe = gpuProbe(); M.phase = null; phaseEnd = now + 300; $('#banner').innerHTML = `<span>Автотест: ${def.name}</span>`; return; }
+      M.phase = { def, collect: true, warmUntil: now + 600, iv: [], cpu: [], dc: [], sprites: [], od: [], parts: [] };
+      phaseEnd = now + def.dur * 1000;
+      $('#banner').innerHTML = `<span>Автотест ${pi + 1}/${PHASES.length}: ${def.name}</span>`;
+    },
+  };
+  // дополнительные выборки спрайтов/перерисовки по ходу фазы
+  autotest.sampler = setInterval(() => { if (M.phase && M.phase.collect) { M.phase.sprites.push(M.sprites); M.phase.od.push(M.overdraw); M.phase.parts.push(liveCount()); } }, 500);
+}
+function summarizePhase(ph) {
+  const f = fpsStats(ph.iv);
+  return { name: ph.def.name, target: ph.def.idle || ph.def.set.quality === 'low' ? 30 : 60, fps: f.avg, low1: f.low1, cpu: avg(ph.cpu), cpu95: pct(ph.cpu, 0.95), dc: Math.max(0, ...ph.dc), sprites: Math.max(0, ...ph.sprites), od: Math.max(0, ...ph.od), parts: Math.max(0, ...ph.parts), frames: ph.iv.length };
+}
+function finishAutotest(saved, results) {
+  clearInterval(autotest.sampler); autotest = null; M.phase = null;
+  Object.assign(S, saved); speedMul = 1; routeDir = 1; applySettings();
+  $('#banner').innerHTML = ''; $('#autotest').disabled = false;
+  const txt = buildSummary(results);
+  M.lastSummary = txt; console.log(txt);
+  $('#summary').value = txt; $('#modal').classList.add('show');
+}
+function mark(ok, warn) { return ok ? '✅' : warn ? '⚠️' : '❌'; }
+function buildSummary(R) {
+  gi = gi || glInfo();
+  const mem = memInfo(); const d = M.decode;
+  const act = R.filter((r) => r.target === 60), idle = R.find((r) => /покой/.test(r.name)), low = R.find((r) => /Низкое/.test(r.name));
+  const minAct = Math.min(...act.map((r) => r.low1)), avgAct = avg(act.map((r) => r.fps));
+  const maxDC = Math.max(...R.map((r) => r.dc)), maxSpr = Math.max(...R.filter((r) => !/стресс/.test(r.name)).map((r) => r.sprites));
+  const maxCpu = Math.max(...R.filter((r) => !/стресс/.test(r.name)).map((r) => r.cpu)), maxOd = Math.max(...R.map((r) => r.od));
+  const g = M.gpuProbe || {};
+  const fogVig = g['всё'] != null ? g['всё'] - g['без тумана и виньетки'] : null;
+  const L1 = [];
+  L1.push('Volcano Ants · спайк рендера v1 · PixiJS 8.22.0 · ' + new Date().toISOString().slice(0, 16).replace('T', ' '));
+  L1.push('Устройство: ' + navigator.userAgent);
+  L1.push(`Экран ${innerWidth}×${innerHeight} CSS, DPR ${DPR}, поле ${renderer.width}×${renderer.height} CSS (${app.canvas.width}×${app.canvas.height} px), deviceMemory ${navigator.deviceMemory || 'н/д'} ГБ, ядер ${navigator.hardwareConcurrency || 'н/д'}`);
+  L1.push(`GPU: ${gi.gpu} · WebGL${gi.webgl} · MAX_TEXTURE_IMAGE_UNITS ${gi.units} · батч Pixi ${gi.batchable} · MAX_TEXTURE_SIZE ${gi.maxTex} · таймер GPU ${gi.timerExt ? 'есть' : 'нет'}`);
+  L1.push('');
+  L1.push('Загрузка:');
+  L1.push(`  pixi.min.js ${M.load.pixiKB ? M.load.pixiKB.toFixed(0) + ' КБ' : '(из кэша)'} за ${M.load.pixiMs != null ? M.load.pixiMs.toFixed(0) : '?'} мс`);
+  L1.push(`  атласы @2x + env: ${M.load.atlasKB.toFixed(0)} КБ за ${M.load.atlasMs.toFixed(0)} мс (декод страницы ≤ ${M.load.decodeMax.toFixed(0)} мс)`);
+  L1.push(`  первый кадр через ${(M.load.firstFrame / 1000).toFixed(2)} с от открытия страницы`);
+  if (d.d1024) L1.push(`  WebP 1024² (${d.d1024.kb.toFixed(0)} КБ): декод ${d.d1024.dec.toFixed(1)} мс (img.decode ${d.d1024.decImg.toFixed(1)}), загрузка в GPU ${d.d1024.up.toFixed(1)} мс`);
+  if (d.d2048) L1.push(`  WebP 2048² (${d.d2048.kb.toFixed(0)} КБ): декод ${d.d2048.dec.toFixed(1)} мс (img.decode ${d.d2048.decImg.toFixed(1)}), загрузка в GPU ${d.d2048.up.toFixed(1)} мс`);
+  L1.push(`Память: текстуры @2x ${texMB('high').toFixed(1)} МБ (+@1x ${texMB('low').toFixed(1)} МБ)` + (mem ? `, JS heap ${mem.used.toFixed(0)}/${mem.total.toFixed(0)} МБ (лимит ${mem.limit.toFixed(0)})` : ', JS heap н/д'));
+  L1.push('');
+  L1.push('Фазы (FPS ср / 1% low · кадр CPU ср/p95 · draw calls · спрайты · частицы · перерисовка):');
+  for (const r of R) L1.push(`  ${r.name} [цель ${r.target}]: ${r.fps.toFixed(1)} / ${r.low1.toFixed(1)} · ${r.cpu.toFixed(2)}/${r.cpu95.toFixed(2)} мс · DC ${r.dc} · ${r.sprites} · ${r.parts} · ${r.od.toFixed(2)}×`);
+  if (M.gpuProbe) L1.push('GPU-проба (рендер+синхронизация, медиана, мс): ' + Object.entries(g).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · '));
+  L1.push('');
+  L1.push('Сверка с §8:');
+  L1.push(`  ${mark(minAct >= 30, minAct >= 25)} FPS при действии не ниже 30: 1% low ${minAct.toFixed(1)}, среднее ${avgAct.toFixed(1)} (цель 60)`);
+  if (idle) L1.push(`  ${mark(Math.abs(idle.fps - 30) < 3, idle.fps > 25)} покой 30 FPS: ${idle.fps.toFixed(1)}`);
+  if (low) L1.push(`  ${mark(low.low1 >= 27, low.low1 >= 22)} «Низкое» держит 30: 1% low ${low.low1.toFixed(1)}`);
+  L1.push(`  ${mark(maxCpu <= 6, maxCpu <= 8)} кадр CPU ≤ 6 мс (потолок 8): ${maxCpu.toFixed(2)}`);
+  L1.push(`  ${mark(maxDC <= 25, maxDC <= 50)} draw calls ≤ 25 (потолок 50): ${maxDC}`);
+  L1.push(`  ${mark(maxSpr <= 1000, maxSpr <= 1500)} спрайтов ≤ 1000: ${maxSpr}`);
+  L1.push(`  ${mark(maxOd <= 3, maxOd <= 4)} перерисовка ≤ 3× (потолок 4×), оценка: ${maxOd.toFixed(2)}×`);
+  L1.push(`  ${mark(gi.units >= 16, gi.units >= 8)} текстурных слотов ≥ 8 страниц: ${gi.units}`);
+  L1.push(`  ${mark(texMB('high') <= 32, texMB('high') <= 48)} текстуры экрана копания ≤ 32 МБ: ${texMB('high').toFixed(1)}`);
+  if (fogVig != null) L1.push(`  ${mark(fogVig <= 2, fogVig <= 3)} туман+виньетка ≤ 2 мс GPU: ≈ ${fogVig.toFixed(2)} мс (разница в GPU-пробе)`);
+  if (d.d2048) L1.push(`  ${mark(d.d2048.up <= 17, d.d2048.up <= 50)} догрузка страницы без подвисания (загрузка в GPU блокирует кадр, цель ≤ 17 мс): 1024² ${d.d1024.up.toFixed(0)} мс, 2048² ${d.d2048.up.toFixed(0)} мс; декод (в фоне) ${d.d1024.dec.toFixed(0)} / ${d.d2048.dec.toFixed(0)} мс`);
+  L1.push(`  ${mark(M.load.firstFrame <= 3000, M.load.firstFrame <= 5000)} первый кадр ≤ 3 с: ${(M.load.firstFrame / 1000).toFixed(2)} с (сеть этого телефона, не 4G-троттлинг)`);
+  return L1.join('\n');
+}
+
+// ---------------------------------------------------------------- ввод и кнопки
+function setupInput() {
+  const f = $('#field'); let drag = null;
+  f.addEventListener('pointerdown', (e) => { if (e.target.id === 'stats') return; drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; f.setPointerCapture(e.pointerId); touch(); });
+  f.addEventListener('pointermove', (e) => { if (!drag) return; cam.x = drag.cx - (e.clientX - drag.x) / cellCss; cam.y = drag.cy - (e.clientY - drag.y) / cellCss; cam.dragUntil = performance.now() + 2500; touch(); });
+  f.addEventListener('pointerup', () => { drag = null; });
+  f.addEventListener('pointercancel', () => { drag = null; });
+  $('#stats').addEventListener('click', () => $('#stats').classList.toggle('small'));
+}
+function applySettings() {
+  // текстуры: при смене качества переставить на @1x / @2x
+  ant.s.texture = tex('hero_idle_00');
+  for (const m of monsters) m.s.texture = tex(`mon_${m.kind}_idle_00`);
+  antLamp.texture = tex('fx_lamp_cone');
+  parts.add.length = 0; parts.norm.length = 0; particlesDirty = true; // частицы пересоздадутся с новой страницей
+  resize();
+  syncChips();
+}
+function syncChips() {
+  document.querySelectorAll('.chip').forEach((b) => {
+    const k = b.dataset.k, v = b.dataset.v;
+    b.classList.toggle('on', v === 'toggle' ? !!S[k] : String(S[k]) === v);
+  });
+}
+function setupUI() {
+  document.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => {
+    if (autotest) return;
+    const k = b.dataset.k, v = b.dataset.v;
+    if (v === 'toggle') S[k] = !S[k];
+    else S[k] = (k === 'zoom' || k === 'particles') ? +v : v;
+    if (k === 'quality' && v === 'low' && !SRC.low.length) { showErr('@1x ещё грузится — повторите через секунду'); S.quality = 'high'; }
+    if (k === 'scene') touch();
+    applySettings();
+  }));
+  $('#autotest').addEventListener('click', startAutotest);
+  $('#close').addEventListener('click', () => $('#modal').classList.remove('show'));
+  $('#copy').addEventListener('click', async () => {
+    const ta = $('#summary');
+    try { await navigator.clipboard.writeText(ta.value); $('#copy').textContent = 'Скопировано ✓'; }
+    catch (e) { ta.focus(); ta.select(); const ok = document.execCommand && document.execCommand('copy'); $('#copy').textContent = ok ? 'Скопировано ✓' : 'Выделено — скопируйте вручную'; }
+  });
+  syncChips();
+}
+
+window.__spike = { M, S, get summary() { return M.lastSummary; } };
+if (!P) showErr('PixiJS не загрузился (нет сети до cdn.jsdelivr.net?)'); else boot();
+</script>
+</body>
+</html>
