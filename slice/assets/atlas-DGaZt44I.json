@@ -7,16 +7,16 @@
    "h": 512,
    "file2x": "atlas_slice_actors@2x.webp",
    "file1x": "atlas_slice_actors@1x.webp",
-   "kb2x": 65.9,
-   "kb1x": 25.8
+   "kb2x": 69.5,
+   "kb1x": 27.3
   },
   "tiles": {
    "w": 512,
    "h": 1024,
    "file2x": "atlas_slice_tiles@2x.webp",
    "file1x": "atlas_slice_tiles@1x.webp",
-   "kb2x": 45.9,
-   "kb1x": 20.6
+   "kb2x": 52.0,
+   "kb1x": 22.6
   }
  },
  "frames": {
@@ -76,7 +76,7 @@
   },
   "cache": {
    "page": "actors",
-   "x": 188,
+   "x": 204,
    "y": 138,
    "w": 96,
    "h": 96,
@@ -94,7 +94,7 @@
   },
   "fx-glow": {
    "page": "tiles",
-   "x": 310,
+   "x": 412,
    "y": 726,
    "w": 64,
    "h": 64,
@@ -110,6 +110,24 @@
    "ax": 0.5,
    "ay": 0.5
   },
+  "fx-lava": {
+   "page": "tiles",
+   "x": 310,
+   "y": 726,
+   "w": 96,
+   "h": 96,
+   "ax": 0.5,
+   "ay": 0.5
+  },
+  "fx-lava-top": {
+   "page": "tiles",
+   "x": 4,
+   "y": 828,
+   "w": 96,
+   "h": 48,
+   "ax": 0.5,
+   "ay": 0.5
+  },
   "fx-select": {
    "page": "tiles",
    "x": 208,
@@ -119,9 +137,27 @@
    "ax": 0.5,
    "ay": 0.5
   },
+  "fx-shadow": {
+   "page": "actors",
+   "x": 322,
+   "y": 264,
+   "w": 64,
+   "h": 20,
+   "ax": 0.5,
+   "ay": 0.5
+  },
+  "fx-warn": {
+   "page": "actors",
+   "x": 252,
+   "y": 264,
+   "w": 64,
+   "h": 56,
+   "ax": 0.5,
+   "ay": 0.5
+  },
   "mon-bombardier": {
    "page": "actors",
-   "x": 378,
+   "x": 394,
    "y": 138,
    "w": 90,
    "h": 86,
@@ -130,7 +166,7 @@
   },
   "mon-centipede": {
    "page": "actors",
-   "x": 290,
+   "x": 306,
    "y": 138,
    "w": 82,
    "h": 90,
@@ -141,8 +177,8 @@
    "page": "actors",
    "x": 86,
    "y": 138,
-   "w": 96,
-   "h": 96,
+   "w": 112,
+   "h": 112,
    "ax": 0.5,
    "ay": 1.0
   },
@@ -300,5 +336,5 @@
    "ay": 0.5
   }
  },
- "totalKB": 158.2
+ "totalKB": 171.4
 }
