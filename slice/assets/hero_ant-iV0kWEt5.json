@@ -1,0 +1,130 @@
+{
+  "about": "Cutout-риг муравья-шахтёра (решение Павла 20.10; арт-библия §5, §8.8; GDD №20 п. 8). Координаты — мировые единицы (клетка = 48), +x — вперёд (смотрит вправо), −y — вверх; корень — точка между ступнями. x, y части — где её точка поворота в системе родителя; rot — градусы по часовой; z — порядок среди детей родителя (картинка родителя — 0). Ключи клипов — смещения от позы покоя (x, y, rot складываются; sx, sy умножаются), frame — замена картинки ступенькой. Картинки hero_* ищутся в атласе среза (atlas.json), нет — рисуются временными векторными частями (src/client/render/hero-ant-parts.ts). Арт Павла: положить части с теми же именами в атлас (якорь = точка поворота) и при надобности поправить x, y, rot здесь.",
+  "version": 1,
+  "parts": [
+    {"name": "body", "parent": null, "frame": "hero_thorax", "x": 0, "y": -20, "z": 0},
+    {"name": "leg_far_upper", "parent": "body", "frame": "hero_leg_upper", "x": -1.5, "y": -0.5, "rot": 6, "z": -6, "tint": "#9c8878"},
+    {"name": "leg_far_lower", "parent": "leg_far_upper", "frame": "hero_leg_lower", "x": 0, "y": 9.5, "rot": -4, "z": 0, "tint": "#9c8878"},
+    {"name": "gear_legs_far", "parent": "leg_far_upper", "frame": null, "x": 0, "y": 0.5, "z": 1, "tint": "#9c8878"},
+    {"name": "gear_boots_far", "parent": "leg_far_lower", "frame": null, "x": 1.6, "y": 9.2, "z": 1, "tint": "#9c8878"},
+    {"name": "mid_far", "parent": "body", "frame": "hero_leg_mid", "x": -2.5, "y": -6, "rot": 35, "z": -5, "tint": "#9c8878"},
+    {"name": "arm_far_upper", "parent": "body", "frame": "hero_arm_upper", "x": 1, "y": -12, "rot": -10, "z": -4, "tint": "#9c8878"},
+    {"name": "arm_far_lower", "parent": "arm_far_upper", "frame": "hero_arm_lower", "x": 0, "y": 7.5, "rot": -40, "z": 0, "tint": "#9c8878"},
+    {"name": "gear_gloves_far", "parent": "arm_far_lower", "frame": null, "x": 0, "y": 7.2, "z": 1, "tint": "#9c8878"},
+    {"name": "gear_shield", "parent": "arm_far_lower", "frame": null, "x": 1.5, "y": 4.5, "z": 2},
+    {"name": "abdomen", "parent": "body", "frame": "hero_abdomen", "x": -3, "y": -2, "z": -3},
+    {"name": "backpack", "parent": "body", "frame": "hero_backpack", "x": -4, "y": -9, "z": -2},
+    {"name": "gear_chest", "parent": "body", "frame": null, "x": 1.2, "y": -7.5, "z": 1},
+    {"name": "mid_near", "parent": "body", "frame": "hero_leg_mid", "x": -1, "y": -5, "rot": 25, "z": 2},
+    {"name": "leg_near_upper", "parent": "body", "frame": "hero_leg_upper", "x": 1, "y": -0.5, "rot": -6, "z": 3},
+    {"name": "leg_near_lower", "parent": "leg_near_upper", "frame": "hero_leg_lower", "x": 0, "y": 9.5, "rot": 4, "z": 0},
+    {"name": "gear_legs_near", "parent": "leg_near_upper", "frame": null, "x": 0, "y": 0.5, "z": 1},
+    {"name": "gear_boots_near", "parent": "leg_near_lower", "frame": null, "x": 1.6, "y": 9.2, "z": 1},
+    {"name": "head", "parent": "body", "frame": "hero_head", "x": 1.5, "y": -14.5, "z": 4},
+    {"name": "antenna_far", "parent": "head", "frame": "hero_antenna", "x": 0, "y": -16, "rot": -12, "z": -1, "tint": "#9c8878"},
+    {"name": "antenna_near", "parent": "head", "frame": "hero_antenna", "x": 5, "y": -17, "rot": 8, "z": 1},
+    {"name": "eye", "parent": "head", "frame": "hero_eye_open", "x": 8, "y": -10.5, "z": 2},
+    {"name": "helmet", "parent": "head", "frame": "hero_helmet", "x": 2.5, "y": -14, "z": 3},
+    {"name": "lamp", "parent": "head", "frame": "hero_lamp", "x": 10.5, "y": -16.5, "z": 4},
+    {"name": "arm_near_upper", "parent": "body", "frame": "hero_arm_upper", "x": 2.5, "y": -12, "rot": -10, "z": 6},
+    {"name": "arm_near_lower", "parent": "arm_near_upper", "frame": "hero_arm_lower", "x": 0, "y": 7.5, "rot": -40, "z": 0},
+    {"name": "pick", "parent": "arm_near_lower", "frame": "hero_pick", "x": 0, "y": 7.2, "rot": 95, "z": -1},
+    {"name": "gear_gloves_near", "parent": "arm_near_lower", "frame": null, "x": 0, "y": 7.2, "z": 1}
+  ],
+  "slots": [
+    {"slot": 0, "parts": ["pick"], "frames": ["hero_pick", "hero_gear_weapon_t1", "hero_gear_weapon_t2", "hero_gear_weapon_t3"]},
+    {"slot": 1, "parts": ["gear_shield"], "frames": [null, "hero_gear_shield_t1", "hero_gear_shield_t2", "hero_gear_shield_t3"]},
+    {"slot": 2, "parts": ["helmet"], "frames": ["hero_helmet", "hero_gear_head_t1", "hero_gear_head_t2", "hero_gear_head_t3"]},
+    {"slot": 3, "parts": ["gear_chest"], "frames": [null, "hero_gear_chest_t1", "hero_gear_chest_t2", "hero_gear_chest_t3"]},
+    {"slot": 4, "parts": ["gear_legs_far", "gear_legs_near"], "frames": [null, "hero_gear_legs_t1", "hero_gear_legs_t2", "hero_gear_legs_t3"]},
+    {"slot": 5, "parts": ["gear_boots_far", "gear_boots_near"], "frames": [null, "hero_gear_boots_t1", "hero_gear_boots_t2", "hero_gear_boots_t3"]},
+    {"slot": 6, "parts": ["gear_gloves_far", "gear_gloves_near"], "frames": [null, "hero_gear_gloves_t1", "hero_gear_gloves_t2", "hero_gear_gloves_t3"]}
+  ],
+  "clips": {
+    "idle": {
+      "dur": 1600,
+      "loop": true,
+      "tracks": {
+        "body": [{"t": 0}, {"t": 800, "sy": 1.025}, {"t": 1600}],
+        "abdomen": [{"t": 0}, {"t": 800, "sx": 1.03, "sy": 1.05}, {"t": 1600}],
+        "head": [{"t": 0}, {"t": 800, "y": -0.5, "rot": -2}, {"t": 1600}],
+        "antenna_far": [{"t": 0}, {"t": 400, "rot": -7}, {"t": 1200, "rot": 4}, {"t": 1600}],
+        "antenna_near": [{"t": 0}, {"t": 600, "rot": 7}, {"t": 1300, "rot": -4}, {"t": 1600}],
+        "eye": [{"t": 0, "frame": "hero_eye_open"}, {"t": 1380, "frame": "hero_eye_closed"}, {"t": 1480, "frame": "hero_eye_open"}],
+        "arm_far_lower": [{"t": 0}, {"t": 800, "rot": -4}, {"t": 1600}]
+      }
+    },
+    "walk": {
+      "dur": 300,
+      "loop": true,
+      "tracks": {
+        "body": [{"t": 0}, {"t": 75, "y": -1.2, "rot": 3}, {"t": 150}, {"t": 225, "y": -1.2, "rot": 3}, {"t": 300}],
+        "leg_near_upper": [{"t": 0, "rot": -28}, {"t": 150, "rot": 24}, {"t": 300, "rot": -28}],
+        "leg_near_lower": [{"t": 0, "rot": 6}, {"t": 75, "rot": 4}, {"t": 150, "rot": 8}, {"t": 225, "rot": 38}, {"t": 300, "rot": 6}],
+        "leg_far_upper": [{"t": 0, "rot": 24}, {"t": 150, "rot": -28}, {"t": 300, "rot": 24}],
+        "leg_far_lower": [{"t": 0, "rot": 8}, {"t": 75, "rot": 38}, {"t": 150, "rot": 6}, {"t": 225, "rot": 4}, {"t": 300, "rot": 8}],
+        "mid_near": [{"t": 0, "rot": -14}, {"t": 150, "rot": 14}, {"t": 300, "rot": -14}],
+        "mid_far": [{"t": 0, "rot": 14}, {"t": 150, "rot": -14}, {"t": 300, "rot": 14}],
+        "arm_far_upper": [{"t": 0, "rot": 18}, {"t": 150, "rot": -18}, {"t": 300, "rot": 18}],
+        "antenna_near": [{"t": 0}, {"t": 150, "rot": 6}, {"t": 300}]
+      }
+    },
+    "dig": {
+      "dur": 220,
+      "loop": false,
+      "tracks": {
+        "body": [{"t": 0}, {"t": 110, "rot": -8, "x": -1}, {"t": 160, "rot": 12, "x": 1.5, "ease": "in"}, {"t": 220, "rot": 8, "x": 1}],
+        "head": [{"t": 0}, {"t": 110, "rot": -6}, {"t": 160, "rot": 6, "ease": "in"}, {"t": 220, "rot": 4}],
+        "arm_near_upper": [{"t": 0}, {"t": 110, "rot": 170, "ease": "out"}, {"t": 160, "rot": 330, "ease": "in"}, {"t": 220, "rot": 330}],
+        "arm_near_lower": [{"t": 0}, {"t": 110, "rot": 60, "ease": "out"}, {"t": 160, "rot": 75, "ease": "in"}, {"t": 220, "rot": 75}],
+        "pick": [{"t": 0}, {"t": 110, "rot": 40, "ease": "out"}, {"t": 160, "ease": "in"}, {"t": 220}],
+        "arm_far_upper": [{"t": 0}, {"t": 110, "rot": 150, "ease": "out"}, {"t": 160, "rot": 330, "ease": "in"}, {"t": 220, "rot": 330}],
+        "eye": [{"t": 0, "frame": "hero_eye_focus"}],
+        "antenna_near": [{"t": 0}, {"t": 110, "rot": -14}, {"t": 160, "rot": 16}, {"t": 220, "rot": 10}],
+        "antenna_far": [{"t": 0}, {"t": 110, "rot": -14}, {"t": 160, "rot": 16}, {"t": 220, "rot": 10}]
+      }
+    },
+    "attack": {
+      "dur": 250,
+      "loop": false,
+      "tracks": {
+        "body": [{"t": 0}, {"t": 60, "rot": -10, "x": -1.5}, {"t": 120, "rot": 16, "x": 4, "ease": "in"}, {"t": 250, "rot": 4, "x": 1}],
+        "head": [{"t": 0}, {"t": 60, "rot": -8}, {"t": 120, "rot": 8, "ease": "in"}, {"t": 250}],
+        "arm_near_upper": [{"t": 0}, {"t": 60, "rot": 170, "ease": "out"}, {"t": 120, "rot": 330, "ease": "in"}, {"t": 250, "rot": 330}],
+        "arm_near_lower": [{"t": 0}, {"t": 60, "rot": 60, "ease": "out"}, {"t": 120, "rot": 75, "ease": "in"}, {"t": 250, "rot": 75}],
+        "pick": [{"t": 0}, {"t": 60, "rot": 40, "ease": "out"}, {"t": 120, "ease": "in"}, {"t": 250}],
+        "leg_near_upper": [{"t": 0}, {"t": 120, "rot": -24}, {"t": 250, "rot": -10}],
+        "leg_far_upper": [{"t": 0}, {"t": 120, "rot": 20}, {"t": 250, "rot": 8}],
+        "eye": [{"t": 0, "frame": "hero_eye_focus"}]
+      }
+    },
+    "hurt": {
+      "dur": 1400,
+      "loop": true,
+      "tracks": {
+        "body": [{"t": 0, "rot": 9, "y": 1}, {"t": 700, "rot": 10, "y": 1, "sy": 1.015}, {"t": 1400, "rot": 9, "y": 1}],
+        "head": [{"t": 0, "rot": 12, "y": 1}, {"t": 700, "rot": 15, "y": 1.3}, {"t": 1400, "rot": 12, "y": 1}],
+        "antenna_far": [{"t": 0, "rot": 40}, {"t": 700, "rot": 46}, {"t": 1400, "rot": 40}],
+        "antenna_near": [{"t": 0, "rot": 34}, {"t": 700, "rot": 40}, {"t": 1400, "rot": 34}],
+        "eye": [{"t": 0, "frame": "hero_eye_hurt"}],
+        "arm_near_upper": [{"t": 0, "rot": 3}, {"t": 1400, "rot": 3}],
+        "arm_near_lower": [{"t": 0, "rot": 20}, {"t": 1400, "rot": 20}],
+        "pick": [{"t": 0, "rot": 60}, {"t": 1400, "rot": 60}],
+        "abdomen": [{"t": 0, "rot": -4}, {"t": 700, "rot": -4, "sy": 1.02}, {"t": 1400, "rot": -4}]
+      }
+    },
+    "win": {
+      "dur": 380,
+      "loop": false,
+      "tracks": {
+        "body": [{"t": 0}, {"t": 190, "rot": -6, "sy": 1.04}, {"t": 380}],
+        "arm_far_upper": [{"t": 0}, {"t": 120, "rot": 175, "ease": "out"}, {"t": 300, "rot": 175}, {"t": 380}],
+        "arm_far_lower": [{"t": 0}, {"t": 120, "rot": 30}, {"t": 300, "rot": 30}, {"t": 380}],
+        "arm_near_upper": [{"t": 0}, {"t": 120, "rot": 155, "ease": "out"}, {"t": 300, "rot": 155}, {"t": 380}],
+        "antenna_near": [{"t": 0}, {"t": 190, "rot": -18}, {"t": 380}],
+        "antenna_far": [{"t": 0}, {"t": 190, "rot": -18}, {"t": 380}],
+        "eye": [{"t": 0, "frame": "hero_eye_closed"}, {"t": 340, "frame": "hero_eye_open"}]
+      }
+    }
+  }
+}
